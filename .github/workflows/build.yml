@@ -36,12 +36,25 @@ jobs:
     - name: Sync App Interface into Android Wrapper
       run: npx cap sync android
 
-    - name: Disable Strict Package Linting Check
+    - name: Patch Gradle Duplication Conflict Configurations
       run: |
         cd android
+        
+        # Enable AndroidX compatibility flags
         echo "android.useAndroidX=true" >> gradle.properties
         echo "android.enableJetifier=true" >> gradle.properties
         echo "org.gradle.dependency.verification=off" >> gradle.properties
+
+        # Inject a strategy rule to force unique Kotlin version alignments and resolve duplicated packages
+        cat << 'EOF' >> app/build.gradle
+        configurations.all {
+            resolutionStrategy {
+                force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'
+                force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'
+                force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'
+            }
+        }
+        EOF
 
     - name: Compile Automated Release APK Package
       run: |
