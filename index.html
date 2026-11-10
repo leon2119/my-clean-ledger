@@ -60,280 +60,67 @@
         .breakdown-list { margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
         .grand-total { font-size: 15px; font-weight: bold; color: #1e3a8a; background: #dbeafe; padding: 6px 12px; border-radius: 6px; display: inline-block; }
 
-        /* Professional Printable Clean Layout Styles */
-        @media print {
-            body { background: white; color: black; padding: 0; }
-            header, .nav-controls, button, .suggest-box, .drawer, .drawer-backdrop { display: none !important; }
-            .grid-container { box-shadow: none; overflow: visible; }
-            table { width: 100%; min-width: 100%; page-break-inside: avoid; }
-            th, td { border: 1px solid #000 !important; padding: 8px; color: black !important; }
-            .cell-input, .column-header-input { background: transparent !important; color: black !important; border: none !important; }
-            .summary-panel { box-shadow: none; page-break-inside: avoid; border-top: 2px solid #000; margin-top: 20px; }
-        }
+        /* Full-Screen High-Fidelity Printable Layout Panels */
+        #print-view-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 5000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; }
+        .print-btn-bar { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 10px; }
+        .print-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+        .print-table th, .print-table td { border: 1px solid #000; padding: 6px; text-align: center; font-size: 12px; }
+        .print-table th { background-color: #f1f5f9; }
     </style>
 </head>
 <body>
-    <header>
-        <div class="nav-controls">
-            <div class="nav-group">
-                <button onclick="toggleLeftDrawer(true)">☰ Pages</button>
-                <button onclick="changePage(-1)">◀</button>
-                <span id="page-indicator" style="font-weight: bold; font-size: 13px; min-width: 50px; text-align: center;">P. 1</span>
-                <button onclick="changePage(1)">▶</button>
+    <div id="main-app-content">
+        <header>
+            <div class="nav-controls">
+                <div class="nav-group">
+                    <button onclick="toggleLeftDrawer(true)">☰ Pages</button>
+                    <button onclick="changePage(-1)">◀</button>
+                    <span id="page-indicator" style="font-weight: bold; font-size: 13px; min-width: 50px; text-align: center;">P. 1</span>
+                    <button onclick="changePage(1)">▶</button>
+                </div>
+                <div class="nav-group">
+                    <button id="lock-btn" class="warn" onclick="toggleEditLock()">🔓 Lock: Off</button>
+                    <button class="secondary" onclick="triggerUndo()">↩ Undo</button>
+                    <button style="background-color: #10b981;" onclick="toggleRightDrawer(true)">📅 Books</button>
+                </div>
             </div>
-            <div class="nav-group">
-                <button id="lock-btn" class="warn" onclick="toggleEditLock()">🔓 Lock: Off</button>
-                <button class="secondary" onclick="triggerUndo()">↩ Undo</button>
-                <button style="background-color: #10b981;" onclick="toggleRightDrawer(true)">📅 Books</button>
-            </div>
+            <label style="font-weight: 600; font-size: 13px;">Top Header Area:</label>
+            <textarea id="top-space" class="top-editable-space" placeholder="Enter ledger page description details..."></textarea>
+        </header>
+
+        <div class="nav-controls" style="margin-bottom: 8px;">
+            <button onclick="addColumn()">➕ Add Col</button>
+            <button class="danger" onclick="deleteLastColumn()">❌ Del Col</button>
+            <button class="secondary" onclick="openCloneModal()">📋 Clone Template</button>
+            <button style="background-color: #8b5cf6;" onclick="openPrintPreview()">📥 Save PDF / Print</button>
         </div>
-        <label style="font-weight: 600; font-size: 13px;">Top Header Area:</label>
-        <textarea id="top-space" class="top-editable-space" placeholder="Enter ledger page description details..."></textarea>
-    </header>
 
-    <div class="nav-controls" style="margin-bottom: 8px;">
-        <button onclick="addColumn()">➕ Add Col</button>
-        <button class="danger" onclick="deleteLastColumn()">❌ Del Col</button>
-        <button class="secondary" onclick="openCloneModal()">📋 Clone Template</button>
-        <button style="background-color: #8b5cf6;" onclick="triggerNativePrint()">📥 Save PDF / Print</button>
+        <div class="grid-container">
+            <table>
+                <thead>
+                    <tr id="header-row"><th class="day-col">Day</th></tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+
+        <div class="summary-panel">
+            <div class="summary-title">Page Summary Breakdown</div>
+            <div id="breakdown-output" class="breakdown-list">No data fields calculated.</div>
+            <div id="grand-total-output" class="grand-total">GRAND TOTAL: ₹0</div>
+        </div>
     </div>
 
-    <div class="grid-container">
-        <table>
-            <thead>
-                <tr id="header-row"><th class="day-col">Day</th></tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-        </table>
-    </div>
-
-    <div class="summary-panel">
-        <div class="summary-title">Page Summary Breakdown</div>
-        <div id="breakdown-output" class="breakdown-list">No data fields calculated.</div>
-        <div id="grand-total-output" class="grand-total">GRAND TOTAL: ₹0</div>
+    <!-- Isolated Print Screen Component -->
+    <div id="print-view-overlay">
+        <div class="print-btn-bar">
+            <button style="background-color: #10b981;" onclick="window.print()">🖨️ Open Android Printer</button>
+            <button class="secondary" onclick="closePrintPreview()">✕ Close Preview</button>
+        </div>
+        <div id="print-document-target"></div>
     </div>
 
     <div id="global-suggest-box" class="suggest-box"></div>
-    <!-- Left Drawer (Pages Navigation Sidebar) -->
-    <div id="left-backdrop" class="drawer-backdrop" onclick="toggleLeftDrawer(false)"></div>
-    <div id="left-drawer" class="drawer">
-        <div class="drawer-header">
-            <span>📖 Book Pages</span>
-            <button class="secondary" style="padding: 4px 8px;" onclick="toggleLeftDrawer(false)">✕</button>
-        </div>
-        <div class="drawer-list" id="left-drawer-list"></div>
-        <button class="secondary" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="addNewPage()">➕ Create Blank Page</button>
-    </div>
-
-    <!-- Right Drawer (Months & Books Archive Sidebar) -->
-    <div id="right-backdrop" class="drawer-backdrop" onclick="toggleRightDrawer(false)"></div>
-    <div id="right-drawer" class="drawer">
-        <div class="drawer-header">
-            <span>📅 Archive Books Ledger</span>
-            <button class="secondary" style="padding: 4px 8px;" onclick="toggleRightDrawer(false)">✕</button>
-        </div>
-        <div style="display: flex; gap: 4px; margin-bottom: 12px;">
-            <select id="new-book-month" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid var(--border); font-size:12px;">
-                <option value="January">Jan</option><option value="February">Feb</option><option value="March">Mar</option>
-                <option value="April">Apr</option><option value="May">May</option><option value="June">June</option>
-                <option value="July">July</option><option value="August">Aug</option><option value="September">Sept</option>
-                <option value="October">Oct</option><option value="November" selected>Nov</option><option value="December">Dec</option>
-            </select>
-            <input type="number" id="new-book-year" value="2026" style="width: 70px; padding: 6px; border-radius: 4px; border: 1px solid var(--border); font-size:12px;" />
-            <button onclick="createNewBookArchive()" style="padding: 6px 10px; font-size:12px;">+ Add</button>
-        </div>
-        <div class="drawer-list" id="right-drawer-list"></div>
-    </div>
-
-    <!-- Clean Value Definition Popup Modal -->
-    <div id="value-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
-        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-            <h3 id="modal-title" style="font-size: 15px; margin-bottom: 8px;">Define Value</h3>
-            <p id="modal-description" style="font-size: 13px; color:#64748b; margin-bottom:12px;"></p>
-            <input type="number" id="modal-value-input" placeholder="Enter Value in Rupees" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; margin-bottom:15px; font-size:14px;" />
-            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button class="secondary" id="modal-btn-local">Save for THIS PAGE Only</button>
-                <button id="modal-btn-global">Save GLOBALLY for this Column</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Clone Layout Template Modal -->
-    <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
-        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-            <h3 style="font-size: 15px; margin-bottom: 8px;">Clone Layout Structure</h3>
-            <p style="font-size: 13px; color:#64748b; margin-bottom:10px;">This copies columns and headers to other pages.</p>
-            <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Apply up to which Page Number?</label>
-            <input type="number" id="clone-target-page" min="1" value="5" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; margin-bottom:15px;" />
-            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button class="secondary" onclick="closeModal('clone-modal')">Cancel</button>
-                <button onclick="executeLayoutClone()">Apply Structure</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Hierarchical App Book Database Setup
-        let appData = {
-            currentBookId: "November_2026",
-            books: {
-                "November_2026": {
-                    currentPage: 1,
-                    globalTemplates: {},
-                    editLocked: false,
-                    pages: {
-                        1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} }
-                    }
-                }
-            }
-        };
-
-        let undoStack = [];
-        let activePromptContext = null;
-        let touchStartX = 0;
-        let touchEndX = 0;
-
-        try {
-            if (window.localStorage && localStorage.getItem("ledger_archive_master")) {
-                appData = JSON.parse(localStorage.getItem("ledger_archive_master"));
-                if (!appData.currentBookId) appData.currentBookId = "November_2026";
-                if (!appData.books) appData.books = {};
-                if (!appData.books[appData.currentBookId]) {
-                    appData.books[appData.currentBookId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
-                }
-            }
-        } catch(e) { console.error("Storage lookup crashed", e); }
-
-        function saveState() {
-            try {
-                if (window.localStorage) localStorage.setItem("ledger_archive_master", JSON.stringify(appData));
-            } catch(e) { console.error("Write error", e); }
-        }
-
-        function getActiveBook() {
-            return appData.books[appData.currentBookId];
-        }
-
-        function pushToUndo() {
-            undoStack.push(JSON.stringify(getActiveBook()));
-            if (undoStack.length > 20) undoStack.shift();
-        }
-
-        function triggerUndo() {
-            let book = getActiveBook();
-            if (book.editLocked) { alert("App is locked. Turn lock off to undo."); return; }
-            if (undoStack.length === 0) { alert("Nothing to undo."); return; }
-            appData.books[appData.currentBookId] = JSON.parse(undoStack.pop());
-            saveState();
-            renderPage();
-        }
-
-        function toggleEditLock() {
-            let book = getActiveBook();
-            book.editLocked = !book.editLocked;
-            saveState();
-            updateLockUI();
-        }
-
-        function updateLockUI() {
-            let book = getActiveBook();
-            const btn = document.getElementById("lock-btn");
-            if (book.editLocked) {
-                btn.innerText = "🔒 Lock: On";
-                btn.className = "warn active";
-            } else {
-                btn.innerText = "🔓 Lock: Off";
-                btn.className = "warn";
-            }
-            renderPage();
-        }
-        function toggleLeftDrawer(open) {
-            const drawer = document.getElementById("left-drawer");
-            const backdrop = document.getElementById("left-backdrop");
-            if (open) {
-                renderLeftDrawerList();
-                backdrop.style.display = "block";
-                setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
-            } else {
-                drawer.classList.remove("open");
-                backdrop.style.opacity = "0";
-                setTimeout(() => { backdrop.style.display = "none"; }, 200);
-            }
-        }
-
-        function renderLeftDrawerList() {
-            let book = getActiveBook();
-            const listContainer = document.getElementById("left-drawer-list");
-            listContainer.innerHTML = "";
-            Object.keys(book.pages).sort((a,b) => a-b).forEach(pNum => {
-                const div = document.createElement("div");
-                div.className = "drawer-item" + (parseInt(pNum) === book.currentPage ? " active" : "");
-                let heading = book.pages[pNum].topSpace.trim();
-                div.innerText = "Page " + pNum + (heading ? ": " + heading : " (Untitled Page)");
-                div.onclick = function() { jumpToPage(parseInt(pNum)); };
-                listContainer.appendChild(div);
-            });
-        }
-
-        function jumpToPage(pNum) {
-            let book = getActiveBook();
-            book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
-            book.currentPage = pNum;
-            saveState();
-            toggleLeftDrawer(false);
-            renderPage();
-        }
-
-        function toggleRightDrawer(open) {
-            const drawer = document.getElementById("right-drawer");
-            const backdrop = document.getElementById("right-backdrop");
-            if (open) {
-                renderRightDrawerList();
-                backdrop.style.display = "block";
-                setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
-            } else {
-                drawer.classList.remove("open");
-                backdrop.style.opacity = "0";
-                setTimeout(() => { backdrop.style.display = "none"; }, 200);
-            }
-        }
-
-        function renderRightDrawerList() {
-            const listContainer = document.getElementById("right-drawer-list");
-            listContainer.innerHTML = "";
-            Object.keys(appData.books).forEach(bId => {
-                const div = document.createElement("div");
-                div.className = "drawer-item" + (bId === appData.currentBookId ? " active" : "");
-                div.innerText = "📅 " + bId.replace("_", " ");
-                div.onclick = function() { switchActiveBook(bId); };
-                listContainer.appendChild(div);
-            });
-        }
-
-        function createNewBookArchive() {
-            const m = document.getElementById("new-book-month").value;
-            const y = document.getElementById("new-book-year").value;
-            const newId = m + "_" + y;
-            if (appData.books[newId]) { alert("This monthly ledger book profile already exists."); return; }
-            appData.books[newId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
-            appData.currentBookId = newId;
-            saveState();
-            renderRightDrawerList();
-            toggleRightDrawer(false);
-            renderPage();
-            updateLockUI();
-        }
-
-        function switchActiveBook(bId) {
-            let currentBook = getActiveBook();
-            currentBook.pages[currentBook.currentPage].topSpace = document.getElementById("top-space").value;
-            appData.currentBookId = bId;
-            saveState();
-            toggleRightDrawer(false);
-            renderPage();
-            updateLockUI();
-        }
-
         function initApp() {
             let book = getActiveBook();
             ensurePageExists(book.currentPage);
@@ -356,7 +143,7 @@
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
             }
         }
-                       function renderPage() {
+        function renderPage() {
             let book = getActiveBook();
             const pageData = book.pages[book.currentPage];
             document.getElementById("page-indicator").innerText = "P. " + book.currentPage;
@@ -417,6 +204,9 @@
             saveState();
 
             if (value === "") { calculateTotals(); return; }
+
+            // FIRST VERSION COMPATIBILITY RULE: Ignore pure numeric inputs to prevent popups for numbers
+            if (!isNaN(value)) { calculateTotals(); return; }
 
             const headerName = book.pages[book.currentPage].headers[col];
             const pageOverride = book.pages[book.currentPage].overrides[headerName]?.[value];
@@ -530,6 +320,8 @@
                                 counts[trackingKey] = { count: 0, val: unitValue, rawWord: word, header: headerName };
                             }
                             counts[trackingKey].count++;
+                        } else if (!isNaN(word)) {
+                            grandTotal += parseFloat(word);
                         }
                     }
                 }
@@ -539,7 +331,7 @@
             if (breakdownOutput) {
                 breakdownOutput.innerHTML = "";
                 const keys = Object.keys(counts);
-                if (keys.length === 0) {
+                if (keys.length === 0 && grandTotal === 0) {
                     breakdownOutput.innerText = "No entries yet.";
                     document.getElementById("grand-total-output").innerText = "GRAND TOTAL: ₹0";
                     return;
@@ -619,7 +411,6 @@
             saveState();
             alert("Layout cloned!");
         }
-
         function changePage(direction) {
             let book = getActiveBook();
             book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
@@ -672,8 +463,44 @@
             touchStartX = 0; touchEndX = 0;
         }
 
-        function triggerNativePrint() {
-            window.print();
+        function openPrintPreview() {
+            let book = getActiveBook();
+            const pageData = book.pages[book.currentPage];
+            let headingText = pageData.topSpace.trim() || "Untitled Page Ledger";
+            
+            let htmlHTML = '<h2>LEDGER REPORT: ' + appData.currentBookId.replace("_", " ") + '</h2>';
+            htmlHTML += '<p><strong>Page No:</strong> ' + book.currentPage + ' | <strong>Notes:</strong> ' + headingText + '</p>';
+            htmlHTML += '<table class="print-table"><thead><tr><th>Day</th>';
+            
+            pageData.headers.forEach(h => { htmlHTML += '<th>' + h + '</th>'; });
+            htmlHTML += '</tr></thead><tbody>';
+            
+            for (let r = 0; r < 31; r++) {
+                let rowHTML = '<tr><td>' + (r + 1) + '</td>';
+                let hasData = false;
+                for (let c = 0; c < pageData.headers.length; c++) {
+                    let cellVal = pageData.grid[r]?.[c] || "";
+                    if (cellVal !== "") hasData = true;
+                    rowHTML += '<td>' + cellVal + '</td>';
+                }
+                rowHTML += '</tr>';
+                if (hasData) htmlHTML += rowHTML;
+            }
+            
+            htmlHTML += '</tbody></table>';
+            htmlHTML += '<div style="margin-top:15px; padding:10px; background:#f1f5f9; border-radius:6px;">';
+            htmlHTML += '<strong>Breakdown Records Summary:</strong><br>' + document.getElementById("breakdown-output").innerHTML;
+            htmlHTML += '<br><span style="font-size:14px; font-weight:bold; color:#1e3a8a;">' + document.getElementById("grand-total-output").innerText + '</span>';
+            htmlHTML += '</div>';
+            
+            document.getElementById("print-document-target").innerHTML = htmlHTML;
+            document.getElementById("main-app-content").style.display = "none";
+            document.getElementById("print-view-overlay").style.display = "flex";
+        }
+
+        function closePrintPreview() {
+            document.getElementById("print-view-overlay").style.display = "none";
+            document.getElementById("main-app-content").style.display = "block";
         }
 
         function openGlobalValuesView() {
