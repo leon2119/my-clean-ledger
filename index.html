@@ -13,11 +13,9 @@
             --text: #0f172a;
             --border: #cbd5e1;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: var(--bg); color: var(--text); padding: 15px; display: flex; flex-direction: column; min-height: 100vh; }
         header { background: var(--surface); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        
         .nav-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
         button { background-color: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; }
         button:hover { background-color: var(--primary-hover); }
@@ -25,28 +23,21 @@
         button.secondary:hover { background-color: #475569; }
         button.danger { background-color: #ef4444; }
         button.danger:hover { background-color: #dc2626; }
-        
         .top-editable-space { width: 100%; min-height: 60px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; resize: vertical; margin-top: 5px; }
-        
         .grid-container { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow-x: auto; margin-bottom: 15px; position: relative; }
         table { border-collapse: collapse; width: 100%; min-width: 600px; }
         th, td { border: 1px solid var(--border); padding: 6px; text-align: center; }
         th { background-color: #f1f5f9; position: sticky; top: 0; }
-        
         .column-header-container { display: flex; flex-direction: column; gap: 5px; align-items: center; }
         .column-header-input { border: 1px solid transparent; background: transparent; font-weight: bold; text-align: center; font-size: 14px; width: 90%; padding: 4px; }
         .column-header-input:focus { border-color: var(--primary); background: white; outline: none; }
-        
         .cell-input { width: 100%; border: none; text-align: center; font-size: 14px; padding: 4px; background: transparent; }
         .cell-input:focus { outline: 2px solid var(--primary); border-radius: 4px; background: white; }
-        
         .day-col { font-weight: bold; background-color: #f8fafc; width: 60px; }
-        
         .summary-panel { background: var(--surface); padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-top: auto; }
         .summary-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
         .breakdown-list { margin-bottom: 15px; font-size: 14px; line-height: 1.6; }
         .grand-total { font-size: 18px; font-weight: bold; color: #1e3a8a; background: #dbeafe; padding: 10px; border-radius: 6px; display: inline-block; }
-        
         .modal-backdrop { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal { background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .modal h3 { margin-bottom: 12px; font-size: 16px; }
@@ -55,7 +46,6 @@
     </style>
 </head>
 <body>
-
     <header>
         <div class="nav-controls">
             <button onclick="changePage(-1)">◀ Previous Page</button>
@@ -75,7 +65,7 @@
     </div>
 
     <div class="grid-container">
-        <table id="ledger-table">
+        <table>
             <thead>
                 <tr id="header-row">
                     <th class="day-col">Day</th>
@@ -90,12 +80,12 @@
         <div id="breakdown-output" class="breakdown-list">No entries yet.</div>
         <div id="grand-total-output" class="grand-total">GRAND TOTAL: ₹0</div>
     </div>
-    <!-- Modal Dialogs -->
+
     <div id="value-modal" class="modal-backdrop">
         <div class="modal">
             <h3 id="modal-title">Define Value</h3>
             <p id="modal-description" style="font-size: 13px; color:#64748b; margin-bottom:10px;"></p>
-            <input type="number" id="modal-value-input" placeholder="Enter Value in Rupees (e.g., 1033)" />
+            <input type="number" id="modal-value-input" placeholder="Enter Value in Rupees" />
             <div class="modal-buttons">
                 <button class="secondary" id="modal-btn-local">Save for THIS PAGE Only</button>
                 <button id="modal-btn-global">Save GLOBALLY for this Column</button>
@@ -115,7 +105,6 @@
             </div>
         </div>
     </div>
-
     <script>
         // Data State Variables
         let state = {
@@ -131,14 +120,21 @@
             }
         };
 
-        if (localStorage.getItem("ledger_book_state")) {
-            try { state = JSON.parse(localStorage.getItem("ledger_book_state")); } catch(e) { console.error(e); }
-        }
+        // Protected local memory check
+        try {
+            if (window.localStorage && localStorage.getItem("ledger_book_state")) {
+                state = JSON.parse(localStorage.getItem("ledger_book_state"));
+            }
+        } catch(e) { console.error("Storage blocked", e); }
 
         let activePromptContext = null;
 
         function saveState() {
-            localStorage.setItem("ledger_book_state", JSON.stringify(state));
+            try {
+                if (window.localStorage) {
+                    localStorage.setItem("ledger_book_state", JSON.stringify(state));
+                }
+            } catch(e) { console.error("Failed to save", e); }
         }
 
         function initApp() {
@@ -147,6 +143,7 @@
         }
 
         function ensurePageExists(pageNo) {
+            if (!state.pages) state.pages = {};
             if (!state.pages[pageNo]) {
                 let defaultColCount = state.pages[1] ? state.pages[1].headers.length : 2;
                 let defaultHeaders = state.pages[1] ? [...state.pages[1].headers] : ["Column 1", "Column 2"];
@@ -158,39 +155,40 @@
                 };
             }
         }
+
         function renderPage() {
             const pageData = state.pages[state.currentPage];
-            document.getElementById("page-indicator").innerText = `Page ${state.currentPage}`;
+            document.getElementById("page-indicator").innerText = "Page " + state.currentPage;
             document.getElementById("top-space").value = pageData.topSpace || "";
 
             const headerRow = document.getElementById("header-row");
-            headerRow.innerHTML = '<th class="day-col">Day</th>';
-            pageData.headers.forEach((headerText, colIndex) => {
-                const th = document.createElement("th");
-                th.innerHTML = `
-                    <div class="column-header-container">
-                        <input type="text" class="column-header-input" value="${headerText}" onchange="updateHeader(${colIndex}, this.value)">
-                    </div>
-                `;
-                headerRow.appendChild(th);
-            });
+            if (headerRow) {
+                headerRow.innerHTML = '<th class="day-col">Day</th>';
+                pageData.headers.forEach((headerText, colIndex) => {
+                    const th = document.createElement("th");
+                    th.innerHTML = '<div class="column-header-container"><input type="text" class="column-header-input" value="' + headerText + '" onchange="updateHeader(' + colIndex + ', this.value)"></div>';
+                    headerRow.appendChild(th);
+                });
+            }
 
             const tbody = document.getElementById("table-body");
-            tbody.innerHTML = "";
-            for (let r = 0; r < 31; r++) {
-                const tr = document.createElement("tr");
-                const dayTd = document.createElement("td");
-                dayTd.className = "day-col";
-                dayTd.innerText = r + 1;
-                tr.appendChild(dayTd);
+            if (tbody) {
+                tbody.innerHTML = "";
+                for (let r = 0; r < 31; r++) {
+                    const tr = document.createElement("tr");
+                    const dayTd = document.createElement("td");
+                    dayTd.className = "day-col";
+                    dayTd.innerText = r + 1;
+                    tr.appendChild(dayTd);
 
-                for (let c = 0; c < pageData.headers.length; c++) {
-                    const td = document.createElement("td");
-                    const val = pageData.grid[r] && pageData.grid[r][c] !== undefined ? pageData.grid[r][c] : "";
-                    td.innerHTML = `<input type="text" class="cell-input" value="${val}" onchange="handleCellEdit(${r}, ${c}, this.value)" />`;
-                    tr.appendChild(td);
+                    for (let c = 0; c < pageData.headers.length; c++) {
+                        const td = document.createElement("td");
+                        const val = pageData.grid[r] && pageData.grid[r][c] !== undefined ? pageData.grid[r][c] : "";
+                        td.innerHTML = '<input type="text" class="cell-input" value="' + val + '" onchange="handleCellEdit(' + r + ', ' + c + ', this.value)" />';
+                        tr.appendChild(td);
+                    }
+                    tbody.appendChild(tr);
                 }
-                tbody.appendChild(tr);
             }
             calculateTotals();
         }
@@ -199,9 +197,11 @@
             state.pages[state.currentPage].headers[colIndex] = newTitle;
             saveState();
         }
-
         function handleCellEdit(row, col, value) {
             value = value.trim();
+            if (!state.pages[state.currentPage].grid[row]) {
+                state.pages[state.currentPage].grid[row] = [];
+            }
             state.pages[state.currentPage].grid[row][col] = value;
             saveState();
 
@@ -223,8 +223,8 @@
 
         function openValueModal(headerName, word, row, col) {
             activePromptContext = { headerName, word, row, col };
-            document.getElementById("modal-title").innerText = `Assign Value for "${word}"`;
-            document.getElementById("modal-description").innerText = `This entry was made under column "${headerName}". What should it compute to?`;
+            document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
+            document.getElementById("modal-description").innerText = 'This entry was made under column "' + headerName + '". What should it compute to?';
             document.getElementById("modal-value-input").value = "";
             document.getElementById("value-modal").style.display = "flex";
             document.getElementById("modal-value-input").focus();
@@ -240,7 +240,8 @@
                 return;
             }
 
-            const { headerName, word } = activePromptContext;
+            const headerName = activePromptContext.headerName;
+            const word = activePromptContext.word;
 
             if (isLocalOnly) {
                 if (!state.pages[state.currentPage].overrides[headerName]) state.pages[state.currentPage].overrides[headerName] = {};
@@ -270,7 +271,7 @@
                         if (unitValue === undefined) unitValue = state.globalTemplates[headerName]?.[word];
                         
                         if (unitValue !== undefined) {
-                            const trackingKey = `${headerName}_${word}`;
+                            const trackingKey = headerName + "_" + word;
                             if (!counts[trackingKey]) {
                                 counts[trackingKey] = { count: 0, val: unitValue, rawWord: word, header: headerName };
                             }
@@ -281,34 +282,41 @@
             });
 
             const breakdownOutput = document.getElementById("breakdown-output");
-            breakdownOutput.innerHTML = "";
+            if (breakdownOutput) {
+                breakdownOutput.innerHTML = "";
+                const keys = Object.keys(counts);
+                if (keys.length === 0) {
+                    breakdownOutput.innerText = "No valued entries inside this page grid yet.";
+                    document.getElementById("grand-total-output").innerText = "GRAND TOTAL: ₹0";
+                    return;
+                }
 
-            const keys = Object.keys(counts);
-            if (keys.length === 0) {
-                breakdownOutput.innerText = "No valued entries inside this page grid yet.";
-                document.getElementById("grand-total-output").innerText = "GRAND TOTAL: ₹0";
-                return;
+                keys.forEach(key => {
+                    const item = counts[key];
+                    const subTotal = item.count * item.val;
+                    grandTotal += subTotal;
+
+                    const div = document.createElement("div");
+                    div.style.marginBottom = "4px";
+                    div.innerHTML = "• <strong>" + item.rawWord + "</strong> in <em>" + item.header + "</em> comes <strong>" + item.count + " times</strong> &rarr; (" + item.val + " x " + item.count + ") = <strong>₹" + subTotal + "</strong>";
+                    breakdownOutput.appendChild(div);
+                });
             }
 
-            keys.forEach(key => {
-                const item = counts[key];
-                const subTotal = item.count * item.val;
-                grandTotal += subTotal;
-
-                const div = document.createElement("div");
-                div.style.marginBottom = "4px";
-                div.innerHTML = `• <strong>${item.rawWord}</strong> in <em>${item.header}</em> comes <strong>${item.count} times</strong> &rarr; (${item.val} x ${item.count}) = <strong>₹${subTotal}</strong>`;
-                breakdownOutput.appendChild(div);
-            });
-
-            document.getElementById("grand-total-output").innerText = `GRAND TOTAL: ₹${grandTotal}`;
+            const grandTotalOutput = document.getElementById("grand-total-output");
+            if (grandTotalOutput) {
+                grandTotalOutput.innerText = "GRAND TOTAL: ₹" + grandTotal;
+            }
         }
 
         function addColumn() {
             const pageData = state.pages[state.currentPage];
             const nextIdx = pageData.headers.length + 1;
-            pageData.headers.push(`Column ${nextIdx}`);
-            for (let r = 0; r < 31; r++) pageData.grid[r].push("");
+            pageData.headers.push("Column " + nextIdx);
+            for (let r = 0; r < 31; r++) {
+                if (!pageData.grid[r]) pageData.grid[r] = [];
+                pageData.grid[r].push("");
+            }
             saveState();
             renderPage();
         }
@@ -318,7 +326,9 @@
             if (pageData.headers.length <= 1) return;
             if(confirm("Are you sure you want to delete the last column?")) {
                 pageData.headers.pop();
-                for (let r = 0; r < 31; r++) pageData.grid[r].pop();
+                for (let r = 0; r < 31; r++) {
+                    if (pageData.grid[r]) pageData.grid[r].pop();
+                }
                 saveState();
                 renderPage();
             }
@@ -347,7 +357,7 @@
             }
             closeModal("clone-modal");
             saveState();
-            alert(`Layout structure cloned across pages 1 to ${limit}!`);
+            alert("Layout structure cloned across pages 1 to " + limit + "!");
         }
 
         function changePage(direction) {
@@ -377,59 +387,17 @@
         function openGlobalValuesView() {
             let msg = "Registered Dictionary Mappings:\n\n";
             Object.keys(state.globalTemplates).forEach(col => {
-                msg += `[Column: ${col}]\n`;
+                msg += "[Column: " + col + "]\n";
                 Object.keys(state.globalTemplates[col]).forEach(w => {
-                    msg += `  "${w}" = ₹${state.globalTemplates[col][w]}\n`;
+                    msg += '  "' + w + '" = ₹' + state.globalTemplates[col][w] + '\n';
                 });
             });
             alert(msg);
         }
 
-initApp();
-              <script>
-    // <![CDATA[
-        // All your JavaScript logic stays safely in here
-        
-        function changePage(direction) {
-            state.pages[state.currentPage].topSpace = document.getElementById("top-space").value;
-            saveState();
-            state.currentPage += direction;
-            if (state.currentPage < 1) state.currentPage = 1;
-            ensurePageExists(state.currentPage);
-            renderPage();
-        }
-
-        function addNewPage() {
-            state.pages[state.currentPage].topSpace = document.getElementById("top-space").value;
-            const absoluteTotalPages = Object.keys(state.pages).length;
-            const newIndexIdx = absoluteTotalPages + 1;
-            ensurePageExists(newIndexIdx);
-            state.currentPage = newIndexIdx;
-            saveState();
-            renderPage();
-        }
-
-        document.getElementById("top-space").oninput = function() {
-            state.pages[state.currentPage].topSpace = this.value;
-            saveState();
+        window.onload = function() {
+            initApp();
         };
-
-        function openGlobalValuesView() {
-            let msg = "Registered Dictionary Mappings:\n\n";
-            Object.keys(state.globalTemplates).forEach(col => {
-                msg += `[Column: ${col}]\n`;
-                Object.keys(state.globalTemplates[col]).forEach(w => {
-                    msg += `  "${w}" = ₹${state.globalTemplates[col][w]}\n`;
-                });
-            });
-            alert(msg);
-        }
-
-        initApp();
-    // ]]>
     </script>
-</body>
-</html>
-
 </body>
 </html>
