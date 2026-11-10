@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dynamic Book Ledger</title>
-    <!-- Include high-fidelity print formatting libraries cleanly -->
-    <script src="https://cloudflare.com"></script>
-    <script src="https://cloudflare.com"></script>
     <style>
         :root {
             --primary: #2563eb;
@@ -45,7 +42,6 @@
         .suggest-item { padding: 6px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
         .suggest-item:hover { background: #e2e8f0; color: var(--primary); }
         
-        /* Two Side Drawers: Left and Right Menus */
         .drawer-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 3000; display: none; opacity: 0; transition: opacity 0.2s ease; }
         .drawer { position: fixed; top: 0; width: 280px; height: 100%; background: white; z-index: 3001; box-shadow: 0 0 15px rgba(0,0,0,0.2); transition: transform 0.2s ease; display: flex; flex-direction: column; padding: 15px; }
         #left-drawer { left: 0; transform: translateX(-100%); }
@@ -63,6 +59,17 @@
         .summary-title { font-size: 14px; font-weight: bold; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
         .breakdown-list { margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
         .grand-total { font-size: 15px; font-weight: bold; color: #1e3a8a; background: #dbeafe; padding: 6px 12px; border-radius: 6px; display: inline-block; }
+
+        /* Professional Printable Clean Layout Styles */
+        @media print {
+            body { background: white; color: black; padding: 0; }
+            header, .nav-controls, button, .suggest-box, .drawer, .drawer-backdrop { display: none !important; }
+            .grid-container { box-shadow: none; overflow: visible; }
+            table { width: 100%; min-width: 100%; page-break-inside: avoid; }
+            th, td { border: 1px solid #000 !important; padding: 8px; color: black !important; }
+            .cell-input, .column-header-input { background: transparent !important; color: black !important; border: none !important; }
+            .summary-panel { box-shadow: none; page-break-inside: avoid; border-top: 2px solid #000; margin-top: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -88,7 +95,7 @@
         <button onclick="addColumn()">➕ Add Col</button>
         <button class="danger" onclick="deleteLastColumn()">❌ Del Col</button>
         <button class="secondary" onclick="openCloneModal()">📋 Clone Template</button>
-        <button style="background-color: #8b5cf6;" onclick="openPdfModal()">📥 Save PDF</button>
+        <button style="background-color: #8b5cf6;" onclick="triggerNativePrint()">📥 Save PDF / Print</button>
     </div>
 
     <div class="grid-container">
@@ -138,7 +145,7 @@
         <div class="drawer-list" id="right-drawer-list"></div>
     </div>
 
-    <!-- Reverted Clean Value Definition Popup Modal -->
+    <!-- Clean Value Definition Popup Modal -->
     <div id="value-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
         <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
             <h3 id="modal-title" style="font-size: 15px; margin-bottom: 8px;">Define Value</h3>
@@ -161,20 +168,6 @@
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
                 <button class="secondary" onclick="closeModal('clone-modal')">Cancel</button>
                 <button onclick="executeLayoutClone()">Apply Structure</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- PDF Export Settings Modal -->
-    <div id="pdf-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
-        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-            <h3 style="font-size: 15px; margin-bottom: 12px;">Export Document Report</h3>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
-                <button style="width: 100%; justify-content: center; background-color:#8b5cf6;" onclick="generatePdfReport('single')">📄 Download Current Page</button>
-                <button style="width: 100%; justify-content: center; background-color:#6366f1;" onclick="generatePdfReport('entire')">📚 Download Entire Book</button>
-            </div>
-            <div style="display: flex; gap: 8px; justify-content: flex-end; border-top:1px solid #f1f5f9; padding-top:10px;">
-                <button class="secondary" onclick="closeModal('pdf-modal')">Close</button>
             </div>
         </div>
     </div>
@@ -220,6 +213,7 @@
         function getActiveBook() {
             return appData.books[appData.currentBookId];
         }
+
         function pushToUndo() {
             undoStack.push(JSON.stringify(getActiveBook()));
             if (undoStack.length > 20) undoStack.shift();
@@ -253,7 +247,6 @@
             }
             renderPage();
         }
-
         function toggleLeftDrawer(open) {
             const drawer = document.getElementById("left-drawer");
             const backdrop = document.getElementById("left-backdrop");
@@ -420,7 +413,7 @@
             if (book.pages[book.currentPage].grid[row][col] === value) return;
             
             pushToUndo();
-            book.pages[book.currentPage].grid[row][col] = value;
+            book.books[appData.currentBookId].pages[book.currentPage].grid[row][col] = value;
             saveState();
 
             if (value === "") { calculateTotals(); return; }
@@ -477,21 +470,20 @@
         function hideSuggestionsLater() {
             setTimeout(() => { document.getElementById("global-suggest-box").style.display = "none"; }, 200);
         }
-                function openValueModal(headerName, word, row, col) {
+
+        function openValueModal(headerName, word, row, col) {
             activePromptContext = { headerName, word, row, col };
             document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
             document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency mapping rate:';
             document.getElementById("modal-value-input").value = "";
             
             closeModal('clone-modal');
-            closeModal('pdf-modal');
             document.getElementById("value-modal").style.display = "flex";
             document.getElementById("modal-value-input").focus();
         }
 
         document.getElementById("modal-btn-local").onclick = function() { savePromptedValue(true); };
         document.getElementById("modal-btn-global").onclick = function() { savePromptedValue(false); };
-
         function savePromptedValue(isLocalOnly) {
             const numericValue = parseFloat(document.getElementById("modal-value-input").value);
             if (isNaN(numericValue)) {
@@ -600,7 +592,6 @@
 
         function openCloneModal() { 
             closeModal('value-modal');
-            closeModal('pdf-modal');
             document.getElementById("clone-modal").style.display = "flex"; 
         }
 
@@ -627,12 +618,6 @@
             closeModal("clone-modal");
             saveState();
             alert("Layout cloned!");
-        }
-
-        function openPdfModal() {
-            closeModal('value-modal');
-            closeModal('clone-modal');
-            document.getElementById("pdf-modal").style.display = "flex";
         }
 
         function changePage(direction) {
@@ -673,6 +658,7 @@
                 handleSwipeMove();
             }, {passive: true});
         }
+
         function handleSwipeMove() {
             const dragDistance = touchEndX - touchStartX;
             if (dragDistance > 140) {
@@ -686,100 +672,8 @@
             touchStartX = 0; touchEndX = 0;
         }
 
-        function generatePdfReport(type) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'pt', 'a4');
-            let book = getActiveBook();
-            let currentPagesToPrint = [];
-
-            if (type === 'single') {
-                currentPagesToPrint.push(book.currentPage);
-            } else {
-                currentPagesToPrint = Object.keys(book.pages).sort((a,b) => a-b).map(Number);
-            }
-
-            currentPagesToPrint.forEach((pNum, index) => {
-                if (index > 0) doc.addPage();
-                
-                const pageData = book.pages[pNum];
-                let headingText = pageData.topSpace.trim() || "Untitled Page Ledger";
-
-                doc.setFontSize(16);
-                doc.setTextColor(37, 99, 235);
-                doc.text("LEDGER BOOK REPORT - " + appData.currentBookId.replace("_", " "), 40, 45);
-                
-                doc.setFontSize(11);
-                doc.setTextColor(15, 23, 42);
-                doc.text("Page Number: " + pNum + " | Index Tag: " + headingText, 40, 65);
-                doc.line(40, 75, 555, 75);
-
-                let tableHeaders = ["Day"];
-                pageData.headers.forEach(h => tableHeaders.push(h));
-
-                let tableRows = [];
-                for (let r = 0; r < 31; r++) {
-                    let rowData = [r + 1];
-                    let hasValue = false;
-                    for (let c = 0; c < pageData.headers.length; c++) {
-                        let cellVal = pageData.grid[r]?.[c] || "";
-                        if (cellVal !== "") hasValue = true;
-                        rowData.push(cellVal);
-                    }
-                    if (hasValue) tableRows.push(rowData);
-                }
-
-                // Fixed solid color code parameters to prevent compilation blanks
-                doc.autoTable({
-                    startY: 90,
-                    head: [tableHeaders],
-                    body: tableRows,
-                    theme: 'grid',
-                    headStyles: { fillColor:, textColor:, fontStyle: 'bold' },
-                    styles: { fontSize: 10, halign: 'center' },
-                    margin: { left: 40, right: 40 }
-                });
-
-                let finalY = doc.lastAutoTable.finalY + 25;
-                doc.setFontSize(12);
-                doc.setFont("Helvetica", "bold");
-                doc.text("Page Summary Records Breakdown:", 40, finalY);
-                
-                doc.setFont("Helvetica", "normal");
-                doc.setFontSize(10);
-                
-                let counts = {};
-                let grandTotal = 0;
-                pageData.headers.forEach((headerName, colIdx) => {
-                    for (let rowIdx = 0; rowIdx < 31; rowIdx++) {
-                        const word = pageData.grid[rowIdx]?.[colIdx];
-                        if (word && word.trim() !== "") {
-                            let unitValue = pageData.overrides[headerName]?.[word];
-                            if (unitValue === undefined) unitValue = book.globalTemplates[headerName]?.[word];
-                            if (unitValue !== undefined) {
-                                const trackingKey = headerName + "_" + word;
-                                if (!counts[trackingKey]) counts[trackingKey] = { count: 0, val: unitValue, rawWord: word, header: headerName };
-                                counts[trackingKey].count++;
-                            }
-                        }
-                    }
-                });
-
-                let summaryLineY = finalY + 15;
-                Object.keys(counts).forEach(key => {
-                    let item = counts[key];
-                    let sub = item.count * item.val;
-                    grandTotal += sub;
-                    doc.text("• " + item.rawWord + " (" + item.header + ") x " + item.count + " occurrences =  Rs. " + sub, 50, summaryLineY);
-                    summaryLineY += 15;
-                });
-
-                doc.setFontSize(12);
-                doc.setFont("Helvetica", "bold");
-                doc.text("GRAND CASH TOTAL:  Rs. " + grandTotal, 40, summaryLineY + 15);
-            });
-
-            doc.save("Ledger_Report_" + appData.currentBookId + ".pdf");
-            closeModal('pdf-modal');
+        function triggerNativePrint() {
+            window.print();
         }
 
         function openGlobalValuesView() {
