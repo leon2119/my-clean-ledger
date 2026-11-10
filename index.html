@@ -356,7 +356,7 @@
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
             }
         }
-        function renderPage() {
+               function renderPage() {
             let book = getActiveBook();
             const pageData = book.pages[book.currentPage];
             document.getElementById("page-indicator").innerText = "P. " + book.currentPage;
@@ -413,7 +413,8 @@
             if (book.pages[book.currentPage].grid[row][col] === value) return;
             
             pushToUndo();
-            book.books[appData.currentBookId].pages[book.currentPage].grid[row][col] = value;
+            // FIXED PATHWAYS: Fixed directory typo causing the modal popups to freeze
+            book.pages[book.currentPage].grid[row][col] = value;
             saveState();
 
             if (value === "") { calculateTotals(); return; }
@@ -619,7 +620,6 @@
             saveState();
             alert("Layout cloned!");
         }
-
         function changePage(direction) {
             let book = getActiveBook();
             book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
@@ -673,7 +673,51 @@
         }
 
         function triggerNativePrint() {
-            window.print();
+            let book = getActiveBook();
+            const pageData = book.pages[book.currentPage];
+            let titleText = pageData.topSpace.trim() || "Untitled Ledger Page";
+            
+            let txtReport = "====================================\n";
+            txtReport += "LEDGER BOOK REPORT: " + appData.currentBookId.replace("_", " ") + "\n";
+            txtReport += "Page No: " + book.currentPage + " | Labeled: " + titleText + "\n";
+            txtReport += "====================================\n\n";
+            
+            let headersLine = "Day\t| " + pageData.headers.join("\t| ");
+            txtReport += headersLine + "\n";
+            txtReport += "-".repeat(headersLine.length) + "\n";
+            
+            for (let r = 0; r < 31; r++) {
+                let rowWords = [];
+                let hasData = false;
+                for (let c = 0; c < pageData.headers.length; c++) {
+                    let word = pageData.grid[r]?.[c] || "";
+                    if (word !== "") hasData = true;
+                    rowWords.push(word || " ");
+                }
+                if (hasData) {
+                    txtReport += (r + 1) + "\t| " + rowWords.join("\t| ") + "\n";
+                }
+            }
+            
+            txtReport += "\n====================================\n";
+            txtReport += document.getElementById("breakdown-output").innerText + "\n";
+            txtReport += document.getElementById("grand-total-output").innerText + "\n";
+            txtReport += "====================================\n";
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Ledger Report Page ' + book.currentPage,
+                    text: txtReport
+                }).catch(err => console.log(err));
+            } else {
+                let txtArea = document.createElement("textarea");
+                txtArea.value = txtReport;
+                document.body.appendChild(txtArea);
+                txtArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(txtArea);
+                alert("Report compiled and copied to clipboard! You can paste it into any text thread or document viewer.");
+            }
         }
 
         function openGlobalValuesView() {
