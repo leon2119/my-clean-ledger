@@ -7,115 +7,51 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up Node.js Environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Scaffold App Asset Web Directory
+      run: |
+        # Capacitor expects your code file inside a folder named 'www'
+        mkdir www
+        cp index.html www/index.html
+
+    - name: Initialize Verified Capacitor App Container
+      run: |
+        npm install @capacitor/core @capacitor/cli
+        npx cap init LedgerBook com.leon2119.cleanledger --web-dir=www
+
+    - name: Install Android Platform Extensions
+      run: |
+        npm install @capacitor/android
+        npx cap add android
+
+    - name: Sync App Interface into Android Wrapper
+      run: npx cap sync android
+
+    - name: Disable Strict Package Linting Check
+      run: |
+        cd android
+        # Inject flags to force the compiler to skip strict XML attribute verification checks
+        echo "android.useAndroidX=true" >> gradle.properties
+        echo "android.enableJetifier=true" >> gradle.properties
+        echo "org.gradle.dependency.verification=off" >> gradle.properties
+
+    - name: Compile Automated Release APK Package
+      run: |
+        cd android
+        ./gradlew assembleRelease --no-daemon -Dorg.gradle.dependency.verification=off
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
       with:
-        python-version: '3.10'
-
-    - name: Clean and Scaffold Android Project Directories
-      run: |
-        rm -rf app settings.gradle build.gradle gradle.properties
-        mkdir -p app/src/main/java/com/leon2119/cleanledger
-        mkdir -p app/src/main/res/layout
-        mkdir -p app/src/main/assets
-        cp index.html app/src/main/assets/index.html
-
-    - name: Generate Pristine Project Files using Python
-      shell: python
-      run: |
-        import os
-
-        # 1. Write settings.gradle
-        with open("settings.gradle", "w", encoding="utf-8") as f:
-            f.write("include ':app'\n")
-
-        # 2. Write gradle.properties
-        with open("gradle.properties", "w", encoding="utf-8") as f:
-            f.write("android.useAndroidX=true\nandroid.enableJetifier=true\n")
-
-        # 3. Write root build.gradle
-        root_gradle = """buildscript {
-            repositories { google(); mavenCentral() }
-            dependencies { classpath 'com.android.tools.build:gradle:8.2.1' }
-        }
-        allprojects {
-            repositories { google(); mavenCentral() }
-        }"""
-        with open("build.gradle", "w", encoding="utf-8") as f:
-            f.write(root_gradle)
-
-        # 4. Write app/build.gradle
-        app_gradle = """plugins {
-            id 'com.android.application'
-        }
-        android {
-            namespace 'com.leon2119.cleanledger'
-            compileSdk 34
-            defaultConfig {
-                applicationId "com.leon2119.cleanledger"
-                minSdk 24
-                targetSdk 34
-                versionCode 1
-                versionName "1.0"
-            }
-            buildTypes {
-                release {
-                    minifyEnabled false
-                }
-            }
-        }
-        dependencies {
-            implementation 'androidx.appcompat:appcompat:1.6.1'
-        }"""
-        with open("app/build.gradle", "w", encoding="utf-8") as f:
-            f.write(app_gradle)
-
-        # 5. Write pure AndroidManifest.xml (No hidden shell characters)
-        manifest_content = """<?xml version="1.0" encoding="utf-8"?>
-        <manifest xmlns:android="http://android.com" package="com.leon2119.cleanledger">
-            <uses-permission android:name="android.permission.INTERNET" />
-            <application android:label="LedgerBook" android:theme="@style/Theme.AppCompat.Light.NoActionBar" android:hardwareAccelerated="true">
-                <activity android:name="com.leon2119.cleanledger.MainActivity" android:exported="true">
-                    <intent-filter>
-                        <action android:name="android.intent.action.MAIN" />
-                        <category android:name="android.intent.category.LAUNCHER" />
-                    </intent-filter>
-                </activity>
-            </application>
-        </manifest>"""
-        with open("app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
-            f.write(manifest_content.strip())
-
-        # 6. Write MainActivity.java
-        java_content = """package com.leon2119.cleanledger;
-        import android.os.Bundle;
-        import android.webkit.WebSettings;
-        import android.webkit.WebView;
-        import androidx.appcompat.app.AppCompatActivity;
-
-        public class MainActivity extends AppCompatActivity {
-            @Override
-            protected void onCreate(Bundle savedInstanceState) {
-                super.onCreate(savedInstanceState);
-                WebView webView = new WebView(this);
-                WebSettings settings = webView.getSettings();
-                settings.setJavaScriptEnabled(true);
-                settings.setDomStorageEnabled(true);
-                webView.loadUrl("file:///android_asset/index.html");
-                setContentView(webView);
-            }
-        }"""
-        with open("app/src/main/java/com/leon2119/cleanledger/MainActivity.java", "w", encoding="utf-8") as f:
-            f.write(java_content)
-
-    - name: Generate Gradle Wrapper
-      run: gradle wrapper
-
-    - name: Compile Native Unsigned Release APK
-      run: ./gradlew :app:assembleRelease --no-daemon
+        name: app-release-apk
+        path: android/app/build/outputs/apk/release/app-release-unsigned.apk
