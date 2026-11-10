@@ -39,13 +39,10 @@ jobs:
     - name: Patch Gradle Duplication Conflict Configurations
       run: |
         cd android
-        
-        # Enable AndroidX compatibility flags
         echo "android.useAndroidX=true" >> gradle.properties
         echo "android.enableJetifier=true" >> gradle.properties
         echo "org.gradle.dependency.verification=off" >> gradle.properties
 
-        # Inject a strategy rule to force unique Kotlin version alignments and resolve duplicated packages
         cat << 'EOF' >> app/build.gradle
         configurations.all {
             resolutionStrategy {
@@ -56,13 +53,14 @@ jobs:
         }
         EOF
 
-    - name: Compile Automated Release APK Package
+    - name: Compile Automated Signed Debug APK Package
       run: |
         cd android
-        ./gradlew assembleRelease --no-daemon -Dorg.gradle.dependency.verification=off
+        # Switching to assembleDebug automatically injects a valid installation signature key
+        ./gradlew assembleDebug --no-daemon -Dorg.gradle.dependency.verification=off
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: app-release-apk
-        path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+        path: android/app/build/outputs/apk/debug/app-debug.apk
