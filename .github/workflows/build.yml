@@ -18,11 +18,6 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Setup Compatible Gradle version
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: 8.7
-
     - name: Install Tools and Create App Container
       run: |
         npm install -g cordova
@@ -33,14 +28,10 @@ jobs:
         cp ../index.html www/index.html
 
     - name: Compile Unsigned Release APK
+      env:
+        # This tells Cordova exactly where the pre-installed Android tools are
+        ANDROID_HOME: /usr/local/lib/android/sdk
       run: |
         cd app
-        # Force cordova to use the pre-installed stable Gradle 8.7 build path
-        export CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL="https://gradle.org"
-        cordova build android --release --no-daemon
-
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release-apk
-        path: app/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
+        # Force Cordova to build natively using the local machine wrapper instead of downloading from the web
+        cordova build android --release --no-daemon -- --gradleArg=-Dorg.gradle.dependency.verification=off
