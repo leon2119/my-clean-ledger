@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dynamic Book Ledger</title>
+    <!-- Include high-fidelity print formatting libraries cleanly -->
+    <script src="https://cloudflare.com"></script>
+    <script src="https://cloudflare.com"></script>
     <style>
         :root {
             --primary: #2563eb;
@@ -38,49 +41,54 @@
         .cell-input:focus { outline: 2px solid var(--primary); border-radius: 4px; background: white; }
         .day-col { font-weight: bold; background-color: #f8fafc; width: 45px; }
         
-        /* Suggestion Overlay System */
         .suggest-box { position: absolute; background: white; border: 1px solid #94a3b8; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); z-index: 2000; display: none; max-height: 120px; overflow-y: auto; text-align: left; width: calc(100% - 10px); left: 5px; }
         .suggest-item { padding: 6px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
         .suggest-item:hover { background: #e2e8f0; color: var(--primary); }
         
-        /* Drawer Sidebar Layout */
-        .drawer-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 3000; display: none; opacity: 0; transition: opacity 0.25s ease; }
-        .drawer { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: white; z-index: 3001; box-shadow: 4px 0 10px rgba(0,0,0,0.15); transition: left 0.25s ease; display: flex; flex-direction: column; padding: 15px; }
-        .drawer.open { left: 0; }
-        .drawer-header { font-size: 16px; font-weight: bold; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        /* Two Side Drawers: Left and Right Menus */
+        .drawer-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 3000; display: none; opacity: 0; transition: opacity 0.2s ease; }
+        .drawer { position: fixed; top: 0; width: 280px; height: 100%; background: white; z-index: 3001; box-shadow: 0 0 15px rgba(0,0,0,0.2); transition: transform 0.2s ease; display: flex; flex-direction: column; padding: 15px; }
+        #left-drawer { left: 0; transform: translateX(-100%); }
+        #left-drawer.open { transform: translateX(0); }
+        #right-drawer { right: 0; transform: translateX(100%); }
+        #right-drawer.open { transform: translateX(0); }
+        
+        .drawer-header { font-size: 15px; font-weight: bold; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
         .drawer-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 6px; }
         .drawer-item { padding: 10px; background: #f1f5f9; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; border-left: 4px solid transparent; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .drawer-item:hover { background: #e2e8f0; }
         .drawer-item.active { background: #dbeafe; border-left-color: var(--primary); color: #1e40af; }
         
         .summary-panel { background: var(--surface); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-top: auto; }
-        .summary-title { font-size: 15px; font-weight: bold; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+        .summary-title { font-size: 14px; font-weight: bold; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
         .breakdown-list { margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
-        .grand-total { font-size: 16px; font-weight: bold; color: #1e3a8a; background: #dbeafe; padding: 8px; border-radius: 6px; display: inline-block; }
+        .grand-total { font-size: 15px; font-weight: bold; color: #1e3a8a; background: #dbeafe; padding: 6px 12px; border-radius: 6px; display: inline-block; }
     </style>
 </head>
 <body>
     <header>
         <div class="nav-controls">
             <div class="nav-group">
-                <button onclick="toggleDrawer(true)">☰ Menu</button>
+                <button onclick="toggleLeftDrawer(true)">☰ Pages</button>
                 <button onclick="changePage(-1)">◀</button>
-                <span id="page-indicator" style="font-weight: bold; font-size: 14px; min-width: 60px; text-align: center;">Page 1</span>
+                <span id="page-indicator" style="font-weight: bold; font-size: 13px; min-width: 50px; text-align: center;">P. 1</span>
                 <button onclick="changePage(1)">▶</button>
             </div>
             <div class="nav-group">
                 <button id="lock-btn" class="warn" onclick="toggleEditLock()">🔓 Lock: Off</button>
                 <button class="secondary" onclick="triggerUndo()">↩ Undo</button>
+                <button style="background-color: #10b981;" onclick="toggleRightDrawer(true)">📅 Books</button>
             </div>
         </div>
         <label style="font-weight: 600; font-size: 13px;">Top Header Area:</label>
-        <textarea id="top-space" class="top-editable-space" placeholder="Enter custom book or page index description..."></textarea>
+        <textarea id="top-space" class="top-editable-space" placeholder="Enter ledger page description details..."></textarea>
     </header>
 
     <div class="nav-controls" style="margin-bottom: 8px;">
-        <button onclick="addColumn()">➕ Add Column</button>
-        <button class="danger" onclick="deleteLastColumn()">❌ Remove Last</button>
-        <button class="secondary" onclick="openCloneModal()">📋 Clone Layout</button>
+        <button onclick="addColumn()">➕ Add Col</button>
+        <button class="danger" onclick="deleteLastColumn()">❌ Del Col</button>
+        <button class="secondary" onclick="openCloneModal()">📋 Clone Template</button>
+        <button style="background-color: #8b5cf6;" onclick="openPdfModal()">📥 Save PDF</button>
     </div>
 
     <div class="grid-container">
@@ -94,57 +102,96 @@
 
     <div class="summary-panel">
         <div class="summary-title">Page Summary Breakdown</div>
-        <div id="breakdown-output" class="breakdown-list">No data recorded.</div>
+        <div id="breakdown-output" class="breakdown-list">No data fields calculated.</div>
         <div id="grand-total-output" class="grand-total">GRAND TOTAL: ₹0</div>
     </div>
 
-    <!-- Suggestion container overlay -->
     <div id="global-suggest-box" class="suggest-box"></div>
-    <!-- Slide-out Sidebar Drawer -->
-    <div id="sidebar-backdrop" class="drawer-backdrop" onclick="toggleDrawer(false)"></div>
-    <div id="sidebar-drawer" class="drawer">
+    <!-- Left Drawer (Pages Navigation Sidebar) -->
+    <div id="left-backdrop" class="drawer-backdrop" onclick="toggleLeftDrawer(false)"></div>
+    <div id="left-drawer" class="drawer">
         <div class="drawer-header">
-            <span>📚 Book Index Pages</span>
-            <button class="secondary" style="padding: 4px 8px;" onclick="toggleDrawer(false)">✕</button>
+            <span>📖 Book Pages</span>
+            <button class="secondary" style="padding: 4px 8px;" onclick="toggleLeftDrawer(false)">✕</button>
         </div>
-        <div class="drawer-list" id="drawer-pages-list"></div>
+        <div class="drawer-list" id="left-drawer-list"></div>
         <button class="secondary" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="addNewPage()">➕ Create Blank Page</button>
     </div>
 
-    <!-- Modals -->
-    <div id="value-modal" class="modal-backdrop">
-        <div class="modal">
-            <h3 id="modal-title">Define Value</h3>
-            <p id="modal-description" style="font-size: 13px; color:#64748b; margin-bottom:10px;"></p>
-            <input type="number" id="modal-value-input" placeholder="Enter Value in Rupees" />
-            <div class="modal-buttons">
+    <!-- Right Drawer (Months & Books Archive Sidebar) -->
+    <div id="right-backdrop" class="drawer-backdrop" onclick="toggleRightDrawer(false)"></div>
+    <div id="right-drawer" class="drawer">
+        <div class="drawer-header">
+            <span>📅 Archive Books Ledger</span>
+            <button class="secondary" style="padding: 4px 8px;" onclick="toggleRightDrawer(false)">✕</button>
+        </div>
+        <div style="display: flex; gap: 4px; margin-bottom: 12px;">
+            <select id="new-book-month" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid var(--border); font-size:12px;">
+                <option value="January">Jan</option><option value="February">Feb</option><option value="March">Mar</option>
+                <option value="April">Apr</option><option value="May">May</option><option value="June">June</option>
+                <option value="July">July</option><option value="August">Aug</option><option value="September">Sept</option>
+                <option value="October">Oct</option><option value="November" selected>Nov</option><option value="December">Dec</option>
+            </select>
+            <input type="number" id="new-book-year" value="2026" style="width: 70px; padding: 6px; border-radius: 4px; border: 1px solid var(--border); font-size:12px;" />
+            <button onclick="createNewBookArchive()" style="padding: 6px 10px; font-size:12px;">+ Add</button>
+        </div>
+        <div class="drawer-list" id="right-drawer-list"></div>
+    </div>
+
+    <!-- Reverted Clean Value Definition Popup Modal -->
+    <div id="value-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            <h3 id="modal-title" style="font-size: 15px; margin-bottom: 8px;">Define Value</h3>
+            <p id="modal-description" style="font-size: 13px; color:#64748b; margin-bottom:12px;"></p>
+            <input type="number" id="modal-value-input" placeholder="Enter Value in Rupees" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; margin-bottom:15px; font-size:14px;" />
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
                 <button class="secondary" id="modal-btn-local">Save for THIS PAGE Only</button>
                 <button id="modal-btn-global">Save GLOBALLY for this Column</button>
             </div>
         </div>
     </div>
 
-    <div id="clone-modal" class="modal-backdrop">
-        <div class="modal">
-            <h3>Clone Layout Structure</h3>
+    <!-- Clone Layout Template Modal -->
+    <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            <h3 style="font-size: 15px; margin-bottom: 8px;">Clone Layout Structure</h3>
             <p style="font-size: 13px; color:#64748b; margin-bottom:10px;">This copies columns and headers to other pages.</p>
-            <label style="font-size:12px; font-weight:bold;">Apply up to which Page Number?</label>
-            <input type="number" id="clone-target-page" min="1" value="5" />
-            <div class="modal-buttons">
+            <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Apply up to which Page Number?</label>
+            <input type="number" id="clone-target-page" min="1" value="5" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; margin-bottom:15px;" />
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
                 <button class="secondary" onclick="closeModal('clone-modal')">Cancel</button>
                 <button onclick="executeLayoutClone()">Apply Structure</button>
             </div>
         </div>
     </div>
 
+    <!-- PDF Export Settings Modal -->
+    <div id="pdf-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            <h3 style="font-size: 15px; margin-bottom: 12px;">Export Document Report</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+                <button style="width: 100%; justify-content: center; background-color:#8b5cf6;" onclick="generatePdfReport('single')">📄 Download Current Page</button>
+                <button style="width: 100%; justify-content: center; background-color:#6366f1;" onclick="generatePdfReport('entire')">📚 Download Entire Book</button>
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end; border-top:1px solid #f1f5f9; padding-top:10px;">
+                <button class="secondary" onclick="closeModal('pdf-modal')">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Core State Layout
-        let state = {
-            currentPage: 1,
-            globalTemplates: {},
-            editLocked: false,
-            pages: {
-                1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} }
+        // Hierarchical App Book Database Setup
+        let appData = {
+            currentBookId: "November_2026",
+            books: {
+                "November_2026": {
+                    currentPage: 1,
+                    globalTemplates: {},
+                    editLocked: false,
+                    pages: {
+                        1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} }
+                    }
+                }
             }
         };
 
@@ -154,40 +201,50 @@
         let touchEndX = 0;
 
         try {
-            if (window.localStorage && localStorage.getItem("ledger_book_state")) {
-                state = JSON.parse(localStorage.getItem("ledger_book_state"));
-                if (state.editLocked === undefined) state.editLocked = false;
+            if (window.localStorage && localStorage.getItem("ledger_archive_master")) {
+                appData = JSON.parse(localStorage.getItem("ledger_archive_master"));
+                if (!appData.currentBookId) appData.currentBookId = "November_2026";
+                if (!appData.books) appData.books = {};
+                if (!appData.books[appData.currentBookId]) {
+                    appData.books[appData.currentBookId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
+                }
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("Storage lookup crashed", e); }
 
         function saveState() {
             try {
-                if (window.localStorage) localStorage.setItem("ledger_book_state", JSON.stringify(state));
-            } catch(e) { console.error(e); }
+                if (window.localStorage) localStorage.setItem("ledger_archive_master", JSON.stringify(appData));
+            } catch(e) { console.error("Write error", e); }
         }
 
+        function getActiveBook() {
+            return appData.books[appData.currentBookId];
+        }
         function pushToUndo() {
-            undoStack.push(JSON.stringify(state));
+            undoStack.push(JSON.stringify(getActiveBook()));
             if (undoStack.length > 20) undoStack.shift();
         }
 
         function triggerUndo() {
-            if (state.editLocked) { alert("App is locked. Turn lock off to undo."); return; }
+            let book = getActiveBook();
+            if (book.editLocked) { alert("App is locked. Turn lock off to undo."); return; }
             if (undoStack.length === 0) { alert("Nothing to undo."); return; }
-            state = JSON.parse(undoStack.pop());
+            appData.books[appData.currentBookId] = JSON.parse(undoStack.pop());
             saveState();
             renderPage();
         }
 
         function toggleEditLock() {
-            state.editLocked = !state.editLocked;
+            let book = getActiveBook();
+            book.editLocked = !book.editLocked;
             saveState();
             updateLockUI();
         }
 
         function updateLockUI() {
+            let book = getActiveBook();
             const btn = document.getElementById("lock-btn");
-            if (state.editLocked) {
+            if (book.editLocked) {
                 btn.innerText = "🔒 Lock: On";
                 btn.className = "warn active";
             } else {
@@ -197,27 +254,28 @@
             renderPage();
         }
 
-        function toggleDrawer(open) {
-            const drawer = document.getElementById("sidebar-drawer");
-            const backdrop = document.getElementById("sidebar-backdrop");
+        function toggleLeftDrawer(open) {
+            const drawer = document.getElementById("left-drawer");
+            const backdrop = document.getElementById("left-backdrop");
             if (open) {
-                renderDrawerList();
+                renderLeftDrawerList();
                 backdrop.style.display = "block";
                 setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
             } else {
                 drawer.classList.remove("open");
                 backdrop.style.opacity = "0";
-                setTimeout(() => { backdrop.style.display = "none"; }, 250);
+                setTimeout(() => { backdrop.style.display = "none"; }, 200);
             }
         }
 
-        function renderDrawerList() {
-            const listContainer = document.getElementById("drawer-pages-list");
+        function renderLeftDrawerList() {
+            let book = getActiveBook();
+            const listContainer = document.getElementById("left-drawer-list");
             listContainer.innerHTML = "";
-            Object.keys(state.pages).sort((a,b) => a-b).forEach(pNum => {
+            Object.keys(book.pages).sort((a,b) => a-b).forEach(pNum => {
                 const div = document.createElement("div");
-                div.className = "drawer-item" + (parseInt(pNum) === state.currentPage ? " active" : "");
-                let heading = state.pages[pNum].topSpace.trim();
+                div.className = "drawer-item" + (parseInt(pNum) === book.currentPage ? " active" : "");
+                let heading = book.pages[pNum].topSpace.trim();
                 div.innerText = "Page " + pNum + (heading ? ": " + heading : " (Untitled Page)");
                 div.onclick = function() { jumpToPage(parseInt(pNum)); };
                 listContainer.appendChild(div);
@@ -225,52 +283,101 @@
         }
 
         function jumpToPage(pNum) {
-            state.pages[state.currentPage].topSpace = document.getElementById("top-space").value;
-            state.currentPage = pNum;
+            let book = getActiveBook();
+            book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
+            book.currentPage = pNum;
             saveState();
-            toggleDrawer(false);
+            toggleLeftDrawer(false);
             renderPage();
         }
+
+        function toggleRightDrawer(open) {
+            const drawer = document.getElementById("right-drawer");
+            const backdrop = document.getElementById("right-backdrop");
+            if (open) {
+                renderRightDrawerList();
+                backdrop.style.display = "block";
+                setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
+            } else {
+                drawer.classList.remove("open");
+                backdrop.style.opacity = "0";
+                setTimeout(() => { backdrop.style.display = "none"; }, 200);
+            }
+        }
+
+        function renderRightDrawerList() {
+            const listContainer = document.getElementById("right-drawer-list");
+            listContainer.innerHTML = "";
+            Object.keys(appData.books).forEach(bId => {
+                const div = document.createElement("div");
+                div.className = "drawer-item" + (bId === appData.currentBookId ? " active" : "");
+                div.innerText = "📅 " + bId.replace("_", " ");
+                div.onclick = function() { switchActiveBook(bId); };
+                listContainer.appendChild(div);
+            });
+        }
+
+        function createNewBookArchive() {
+            const m = document.getElementById("new-book-month").value;
+            const y = document.getElementById("new-book-year").value;
+            const newId = m + "_" + y;
+            if (appData.books[newId]) { alert("This monthly ledger book profile already exists."); return; }
+            appData.books[newId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
+            appData.currentBookId = newId;
+            saveState();
+            renderRightDrawerList();
+            toggleRightDrawer(false);
+            renderPage();
+            updateLockUI();
+        }
+
+        function switchActiveBook(bId) {
+            let currentBook = getActiveBook();
+            currentBook.pages[currentBook.currentPage].topSpace = document.getElementById("top-space").value;
+            appData.currentBookId = bId;
+            saveState();
+            toggleRightDrawer(false);
+            renderPage();
+            updateLockUI();
+        }
+
         function initApp() {
-            ensurePageExists(state.currentPage);
+            let book = getActiveBook();
+            ensurePageExists(book.currentPage);
             updateLockUI();
             setupSwipeGestures();
         }
 
         function ensurePageExists(pageNo) {
-            if (!state.pages) state.pages = {};
-            if (!state.pages[pageNo]) {
+            let book = getActiveBook();
+            if (!book.pages) book.pages = {};
+            if (!book.pages[pageNo]) {
                 let defaultColCount = 2;
                 let defaultHeaders = ["Column 1", "Column 2"];
-                
-                if (state.pages && state.pages[1]) {
-                    defaultColCount = state.pages[1].headers.length;
-                    defaultHeaders = [...state.pages[1].headers];
+                let keys = Object.keys(book.pages);
+                if (keys.length > 0) {
+                    let firstPage = book.pages[keys[0]];
+                    defaultColCount = firstPage.headers.length;
+                    defaultHeaders = [...firstPage.headers];
                 }
-                
-                state.pages[pageNo] = {
-                    topSpace: "",
-                    headers: defaultHeaders,
-                    grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")),
-                    overrides: {}
-                };
+                book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
             }
         }
-
         function renderPage() {
-            const pageData = state.pages[state.currentPage];
-            document.getElementById("page-indicator").innerText = "Page " + state.currentPage;
+            let book = getActiveBook();
+            const pageData = book.pages[book.currentPage];
+            document.getElementById("page-indicator").innerText = "P. " + book.currentPage;
             
             const topSpaceInput = document.getElementById("top-space");
             topSpaceInput.value = pageData.topSpace || "";
-            topSpaceInput.disabled = state.editLocked;
+            topSpaceInput.disabled = book.editLocked;
 
             const headerRow = document.getElementById("header-row");
             if (headerRow) {
                 headerRow.innerHTML = '<th class="day-col">Day</th>';
                 pageData.headers.forEach((headerText, colIndex) => {
                     const th = document.createElement("th");
-                    const disabledAttr = state.editLocked ? 'disabled' : '';
+                    const disabledAttr = book.editLocked ? 'disabled' : '';
                     th.innerHTML = '<div class="column-header-container"><input type="text" class="column-header-input" value="' + headerText + '" onchange="updateHeader(' + colIndex + ', this.value)" ' + disabledAttr + '></div>';
                     headerRow.appendChild(th);
                 });
@@ -289,8 +396,7 @@
                     for (let c = 0; c < pageData.headers.length; c++) {
                         const td = document.createElement("td");
                         const val = pageData.grid[r] && pageData.grid[r][c] !== undefined ? pageData.grid[r][c] : "";
-                        const disabledAttr = state.editLocked ? 'disabled' : '';
-                        
+                        const disabledAttr = book.editLocked ? 'disabled' : '';
                         td.innerHTML = '<input type="text" class="cell-input" value="' + val + '" oninput="showSuggestions(this, ' + r + ', ' + c + ')" onblur="hideSuggestionsLater()" onchange="handleCellEdit(' + r + ', ' + c + ', this.value)" ' + disabledAttr + ' />';
                         tr.appendChild(td);
                     }
@@ -302,30 +408,26 @@
 
         function updateHeader(colIndex, newTitle) {
             pushToUndo();
-            state.pages[state.currentPage].headers[colIndex] = newTitle;
+            let book = getActiveBook();
+            book.pages[book.currentPage].headers[colIndex] = newTitle;
             saveState();
         }
 
         function handleCellEdit(row, col, value) {
+            let book = getActiveBook();
             value = value.trim();
-            if (!state.pages[state.currentPage].grid[row]) {
-                state.pages[state.currentPage].grid[row] = [];
-            }
-            
-            if (state.pages[state.currentPage].grid[row][col] === value) return;
+            if (!book.pages[book.currentPage].grid[row]) book.pages[book.currentPage].grid[row] = [];
+            if (book.pages[book.currentPage].grid[row][col] === value) return;
             
             pushToUndo();
-            state.pages[state.currentPage].grid[row][col] = value;
+            book.pages[book.currentPage].grid[row][col] = value;
             saveState();
 
-            if (value === "") {
-                calculateTotals();
-                return;
-            }
+            if (value === "") { calculateTotals(); return; }
 
-            const headerName = state.pages[state.currentPage].headers[col];
-            const pageOverride = state.pages[state.currentPage].overrides[headerName]?.[value];
-            const globalValue = state.globalTemplates[headerName]?.[value];
+            const headerName = book.pages[book.currentPage].headers[col];
+            const pageOverride = book.pages[book.currentPage].overrides[headerName]?.[value];
+            const globalValue = book.globalTemplates[headerName]?.[value];
 
             if (pageOverride === undefined && globalValue === undefined) {
                 openValueModal(headerName, value, row, col);
@@ -333,27 +435,22 @@
                 calculateTotals();
             }
         }
-        // Live Dropdown Suggestions Engine
+
         function showSuggestions(inputEl, row, col) {
+            let book = getActiveBook();
             const query = inputEl.value.trim().toLowerCase();
             const box = document.getElementById("global-suggest-box");
-            
             if (!query) { box.style.display = "none"; return; }
             
-            const headerName = state.pages[state.currentPage].headers[col];
+            const headerName = book.pages[book.currentPage].headers[col];
             let options = [];
-            
-            if (state.globalTemplates[headerName]) {
-                options = Object.keys(state.globalTemplates[headerName]);
-            }
-            if (state.pages[state.currentPage].overrides[headerName]) {
-                Object.keys(state.pages[state.currentPage].overrides[headerName]).forEach(k => {
+            if (book.globalTemplates[headerName]) options = Object.keys(book.globalTemplates[headerName]);
+            if (book.pages[book.currentPage].overrides[headerName]) {
+                Object.keys(book.pages[book.currentPage].overrides[headerName]).forEach(k => {
                     if (!options.includes(k)) options.push(k);
                 });
             }
-            
             const matches = options.filter(opt => opt.toLowerCase().startsWith(query));
-            
             if (matches.length === 0) { box.style.display = "none"; return; }
             
             const rect = inputEl.getBoundingClientRect();
@@ -380,12 +477,14 @@
         function hideSuggestionsLater() {
             setTimeout(() => { document.getElementById("global-suggest-box").style.display = "none"; }, 200);
         }
-
         function openValueModal(headerName, word, row, col) {
             activePromptContext = { headerName, word, row, col };
             document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
             document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency mapping rate:';
             document.getElementById("modal-value-input").value = "";
+            
+            closeModal('clone-modal');
+            closeModal('pdf-modal');
             document.getElementById("value-modal").style.display = "flex";
             document.getElementById("modal-value-input").focus();
         }
@@ -402,14 +501,15 @@
 
             const headerName = activePromptContext.headerName;
             const word = activePromptContext.word;
+            let book = getActiveBook();
 
             pushToUndo();
             if (isLocalOnly) {
-                if (!state.pages[state.currentPage].overrides[headerName]) state.pages[state.currentPage].overrides[headerName] = {};
-                state.pages[state.currentPage].overrides[headerName][word] = numericValue;
+                if (!book.pages[book.currentPage].overrides[headerName]) book.pages[book.currentPage].overrides[headerName] = {};
+                book.pages[book.currentPage].overrides[headerName][word] = numericValue;
             } else {
-                if (!state.globalTemplates[headerName]) state.globalTemplates[headerName] = {};
-                state.globalTemplates[headerName][word] = numericValue;
+                if (!book.globalTemplates[headerName]) book.globalTemplates[headerName] = {};
+                book.globalTemplates[headerName][word] = numericValue;
             }
 
             closeModal("value-modal");
@@ -418,8 +518,10 @@
         }
 
         function closeModal(id) { document.getElementById(id).style.display = "none"; }
+
         function calculateTotals() {
-            const pageData = state.pages[state.currentPage];
+            let book = getActiveBook();
+            const pageData = book.pages[book.currentPage];
             let counts = {}; 
             let grandTotal = 0;
 
@@ -428,7 +530,7 @@
                     const word = pageData.grid[rowIdx]?.[colIdx];
                     if (word && word.trim() !== "") {
                         let unitValue = pageData.overrides[headerName]?.[word];
-                        if (unitValue === undefined) unitValue = state.globalTemplates[headerName]?.[word];
+                        if (unitValue === undefined) unitValue = book.globalTemplates[headerName]?.[word];
                         
                         if (unitValue !== undefined) {
                             const trackingKey = headerName + "_" + word;
@@ -466,9 +568,10 @@
         }
 
         function addColumn() {
-            if (state.editLocked) { alert("App is locked."); return; }
+            let book = getActiveBook();
+            if (book.editLocked) { alert("App is locked."); return; }
             pushToUndo();
-            const pageData = state.pages[state.currentPage];
+            const pageData = book.pages[book.currentPage];
             const nextIdx = pageData.headers.length + 1;
             pageData.headers.push("Column " + nextIdx);
             for (let r = 0; r < 31; r++) {
@@ -480,8 +583,9 @@
         }
 
         function deleteLastColumn() {
-            if (state.editLocked) { alert("App is locked."); return; }
-            const pageData = state.pages[state.currentPage];
+            let book = getActiveBook();
+            if (book.editLocked) { alert("App is locked."); return; }
+            const pageData = book.pages[book.currentPage];
             if (pageData.headers.length <= 1) return;
             if (confirm("Delete the last column data stream entirely?")) {
                 pushToUndo();
@@ -494,24 +598,29 @@
             }
         }
 
-        function openCloneModal() { document.getElementById("clone-modal").style.display = "flex"; }
+        function openCloneModal() { 
+            closeModal('value-modal');
+            closeModal('pdf-modal');
+            document.getElementById("clone-modal").style.display = "flex"; 
+        }
 
         function executeLayoutClone() {
+            let book = getActiveBook();
             const limit = parseInt(document.getElementById("clone-target-page").value);
             if (isNaN(limit) || limit < 1) return;
 
-            const sourceHeaders = [...state.pages[state.currentPage].headers];
+            const sourceHeaders = [...book.pages[book.currentPage].headers];
             const colCount = sourceHeaders.length;
 
             for (let p = 1; p <= limit; p++) {
                 ensurePageExists(p);
-                if (p !== state.currentPage) {
-                    state.pages[p].headers = [...sourceHeaders];
+                if (p !== book.currentPage) {
+                    book.pages[p].headers = [...sourceHeaders];
                     for (let r = 0; r < 31; r++) {
-                        let rowArr = state.pages[p].grid[r] || [];
+                        let rowArr = book.pages[p].grid[r] || [];
                         while(rowArr.length < colCount) rowArr.push("");
                         if (rowArr.length > colCount) rowArr = rowArr.slice(0, colCount);
-                        state.pages[p].grid[r] = rowArr;
+                        book.pages[p].grid[r] = rowArr;
                     }
                 }
             }
@@ -520,31 +629,40 @@
             alert("Layout cloned!");
         }
 
+        function openPdfModal() {
+            closeModal('value-modal');
+            closeModal('clone-modal');
+            document.getElementById("pdf-modal").style.display = "flex";
+        }
+
         function changePage(direction) {
-            state.pages[state.currentPage].topSpace = document.getElementById("top-space").value;
+            let book = getActiveBook();
+            book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
             saveState();
-            let target = state.currentPage + direction;
+            let target = book.currentPage + direction;
             if (target < 1) target = 1;
             ensurePageExists(target);
-            state.currentPage = target;
+            book.currentPage = target;
             saveState();
             renderPage();
         }
 
         function addNewPage() {
-            state.pages[state.currentPage].topSpace = document.getElementById("top-space").value;
-            const absoluteTotalPages = Object.keys(state.pages).length;
+            let book = getActiveBook();
+            book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
+            const absoluteTotalPages = Object.keys(book.pages).length;
             const newIndexIdx = absoluteTotalPages + 1;
             ensurePageExists(newIndexIdx);
-            state.currentPage = newIndexIdx;
+            book.currentPage = newIndexIdx;
             saveState();
-            toggleDrawer(false);
+            toggleLeftDrawer(false);
             renderPage();
         }
 
         document.getElementById("top-space").onchange = function() {
             pushToUndo();
-            state.pages[state.currentPage].topSpace = this.value;
+            let book = getActiveBook();
+            book.pages[book.currentPage].topSpace = this.value;
             saveState();
         };
 
@@ -555,23 +673,121 @@
                 handleSwipeMove();
             }, {passive: true});
         }
-
         function handleSwipeMove() {
-            if (touchEndX - touchStartX > 130) {
-                toggleDrawer(true);
+            const dragDistance = touchEndX - touchStartX;
+            if (dragDistance > 140) {
+                toggleLeftDrawer(true);
+                toggleRightDrawer(false);
             }
-            if (touchStartX - touchEndX > 130) {
-                touchStartX = 0; touchEndX = 0;
-                toggleDrawer(false);
+            if (dragDistance < -140) {
+                toggleRightDrawer(true);
+                toggleLeftDrawer(false);
             }
+            touchStartX = 0; touchEndX = 0;
+        }
+
+        function generatePdfReport(type) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'pt', 'a4');
+            let book = getActiveBook();
+            let currentPagesToPrint = [];
+
+            if (type === 'single') {
+                currentPagesToPrint.push(book.currentPage);
+            } else {
+                currentPagesToPrint = Object.keys(book.pages).sort((a,b) => a-b).map(Number);
+            }
+
+            currentPagesToPrint.forEach((pNum, index) => {
+                if (index > 0) doc.addPage();
+                
+                const pageData = book.pages[pNum];
+                let headingText = pageData.topSpace.trim() || "Untitled Page Ledger";
+
+                doc.setFontSize(16);
+                doc.setTextColor(37, 99, 235);
+                doc.text("LEDGER BOOK REPORT - " + appData.currentBookId.replace("_", " "), 40, 45);
+                
+                doc.setFontSize(11);
+                doc.setTextColor(15, 23, 42);
+                doc.text("Page Number: " + pNum + " | Index Tag: " + headingText, 40, 65);
+                doc.line(40, 75, 555, 75);
+
+                let tableHeaders = ["Day"];
+                pageData.headers.forEach(h => tableHeaders.push(h));
+
+                let tableRows = [];
+                for (let r = 0; r < 31; r++) {
+                    let rowData = [r + 1];
+                    let hasValue = false;
+                    for (let c = 0; c < pageData.headers.length; c++) {
+                        let cellVal = pageData.grid[r]?.[c] || "";
+                        if (cellVal !== "") hasValue = true;
+                        rowData.push(cellVal);
+                    }
+                    if (hasValue) tableRows.push(rowData);
+                }
+
+                doc.autoTable({
+                    startY: 90,
+                    head: [tableHeaders],
+                    body: tableRows,
+                    theme: 'grid',
+                    headStyles: { fillColor:, textColor:, fontStyle: 'bold' },
+                    styles: { fontSize: 10, halign: 'center' },
+                    margin: { left: 40, right: 40 }
+                });
+
+                let finalY = doc.lastAutoTable.finalY + 25;
+                doc.setFontSize(12);
+                doc.setFont("Helvetica", "bold");
+                doc.text("Page Summary Records Breakdown:", 40, finalY);
+                
+                doc.setFont("Helvetica", "normal");
+                doc.setFontSize(10);
+                
+                let counts = {};
+                let grandTotal = 0;
+                pageData.headers.forEach((headerName, colIdx) => {
+                    for (let rowIdx = 0; rowIdx < 31; rowIdx++) {
+                        const word = pageData.grid[rowIdx]?.[colIdx];
+                        if (word && word.trim() !== "") {
+                            let unitValue = pageData.overrides[headerName]?.[word];
+                            if (unitValue === undefined) unitValue = book.globalTemplates[headerName]?.[word];
+                            if (unitValue !== undefined) {
+                                const trackingKey = headerName + "_" + word;
+                                if (!counts[trackingKey]) counts[trackingKey] = { count: 0, val: unitValue, rawWord: word, header: headerName };
+                                counts[trackingKey].count++;
+                            }
+                        }
+                    }
+                });
+
+                let summaryLineY = finalY + 15;
+                Object.keys(counts).forEach(key => {
+                    let item = counts[key];
+                    let sub = item.count * item.val;
+                    grandTotal += sub;
+                    doc.text("• " + item.rawWord + " (" + item.header + ") x " + item.count + " occurrences =  Rs. " + sub, 50, summaryLineY);
+                    summaryLineY += 15;
+                });
+
+                doc.setFontSize(12);
+                doc.setFont("Helvetica", "bold");
+                doc.text("GRAND CASH TOTAL:  Rs. " + grandTotal, 40, summaryLineY + 15);
+            });
+
+            doc.save("Ledger_Report_" + appData.currentBookId + ".pdf");
+            closeModal('pdf-modal');
         }
 
         function openGlobalValuesView() {
             let msg = "Registered Dictionary Mappings:\n\n";
-            Object.keys(state.globalTemplates).forEach(col => {
+            let book = getActiveBook();
+            Object.keys(book.globalTemplates).forEach(col => {
                 msg += "[Column: " + col + "]\n";
-                Object.keys(state.globalTemplates[col]).forEach(w => {
-                    msg += '  "' + w + '" = ₹' + state.globalTemplates[col][w] + '\n';
+                Object.keys(book.globalTemplates[col]).forEach(w => {
+                    msg += '  "' + w + '" = ₹' + book.globalTemplates[col][w] + '\n';
                 });
             });
             alert(msg);
