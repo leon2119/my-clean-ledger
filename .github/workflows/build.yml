@@ -13,45 +13,106 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Scaffold Native Android App Project
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Clean and Scaffold Android Project Directories
       run: |
+        rm -rf app settings.gradle build.gradle gradle.properties
         mkdir -p app/src/main/java/com/leon2119/cleanledger
         mkdir -p app/src/main/res/layout
         mkdir -p app/src/main/assets
-
         cp index.html app/src/main/assets/index.html
 
-        echo "include ':app'" > settings.gradle
-        echo "android.useAndroidX=true" > gradle.properties
-        echo "android.enableJetifier=true" >> gradle.properties
-
-        printf "buildscript {\n    repositories { google(); mavenCentral() }\n    dependencies { classpath 'com.android.tools.build:gradle:8.2.1' }\n}\nallprojects {\n    repositories { google(); mavenCentral() }\n}\n" > build.gradle
-        
-        printf "plugins {\n    id 'com.android.application'\n}\nandroid {\n    namespace 'com.leon2119.cleanledger'\n    compileSdk 34\n    defaultConfig {\n        applicationId \"com.leon2119.cleanledger\"\n        minSdk 24\n        targetSdk 34\n        versionCode 1\n        versionName \"1.0\"\n    }\n    buildTypes {\n        release {\n            minifyEnabled false\n        }\n    }\n}\ndependencies {\n    implementation 'androidx.appcompat:appcompat:1.6.1'\n}\n" > app/build.gradle
-
-    - name: Build Android Manifest and Native Java Shell
+    - name: Generate Pristine Project Files using Python
+      shell: python
       run: |
-        # Using a raw string block to prevent variable stripping
-        echo '<?xml version="1.0" encoding="utf-8"?>' > app/src/main/AndroidManifest.xml
-        echo '<manifest xmlns:android="http://android.com">' >> app/src/main/AndroidManifest.xml
-        echo '    <uses-permission android:name="android.permission.INTERNET" />' >> app/src/main/AndroidManifest.xml
-        echo '    <application android:label="LedgerBook" android:theme="@style/Theme.AppCompat.Light.NoActionBar" android:hardwareAccelerated="true">' >> app/src/main/AndroidManifest.xml
-        echo '        <activity android:name="com.leon2119.cleanledger.MainActivity" android:exported="true">' >> app/src/main/AndroidManifest.xml
-        echo '            <intent-filter>' >> app/src/main/AndroidManifest.xml
-        echo '                <action android:name="android.intent.action.MAIN" />' >> app/src/main/AndroidManifest.xml
-        echo '                <category android:name="android.intent.category.LAUNCHER" />' >> app/src/main/AndroidManifest.xml
-        echo '            </intent-filter>' >> app/src/main/AndroidManifest.xml
-        echo '        </activity>' >> app/src/main/AndroidManifest.xml
-        echo '    </application>' >> app/src/main/AndroidManifest.xml
-        echo '</manifest>' >> app/src/main/AndroidManifest.xml
+        import os
 
-        printf "package com.leon2119.cleanledger;\nimport android.os.Bundle;\nimport android.webkit.WebSettings;\nimport android.webkit.WebView;\nimport androidx.appcompat.app.AppCompatActivity;\npublic class MainActivity extends AppCompatActivity {\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        WebView webView = new WebView(this);\n        WebSettings settings = webView.getSettings();\n        settings.setJavaScriptEnabled(true);\n        settings.setDomStorageEnabled(true);\n        webView.loadUrl(\"file:///android_asset/index.html\");\n        setContentView(webView);\n    }\n}\n" > app/src/main/java/com/leon2119/cleanledger/MainActivity.java
+        # 1. Write settings.gradle
+        with open("settings.gradle", "w", encoding="utf-8") as f:
+            f.write("include ':app'\n")
 
-    - name: DIAGNOSTIC - Print Generated Manifest
-      run: |
-        echo "=== START OF GENERATED MANIFEST ==="
-        cat app/src/main/AndroidManifest.xml
-        echo "=== END OF GENERATED MANIFEST ==="
+        # 2. Write gradle.properties
+        with open("gradle.properties", "w", encoding="utf-8") as f:
+            f.write("android.useAndroidX=true\nandroid.enableJetifier=true\n")
+
+        # 3. Write root build.gradle
+        root_gradle = """buildscript {
+            repositories { google(); mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.2.1' }
+        }
+        allprojects {
+            repositories { google(); mavenCentral() }
+        }"""
+        with open("build.gradle", "w", encoding="utf-8") as f:
+            f.write(root_gradle)
+
+        # 4. Write app/build.gradle
+        app_gradle = """plugins {
+            id 'com.android.application'
+        }
+        android {
+            namespace 'com.leon2119.cleanledger'
+            compileSdk 34
+            defaultConfig {
+                applicationId "com.leon2119.cleanledger"
+                minSdk 24
+                targetSdk 34
+                versionCode 1
+                versionName "1.0"
+            }
+            buildTypes {
+                release {
+                    minifyEnabled false
+                }
+            }
+        }
+        dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+        }"""
+        with open("app/build.gradle", "w", encoding="utf-8") as f:
+            f.write(app_gradle)
+
+        # 5. Write pure AndroidManifest.xml (No hidden shell characters)
+        manifest_content = """<?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://android.com" package="com.leon2119.cleanledger">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <application android:label="LedgerBook" android:theme="@style/Theme.AppCompat.Light.NoActionBar" android:hardwareAccelerated="true">
+                <activity android:name="com.leon2119.cleanledger.MainActivity" android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>"""
+        with open("app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
+            f.write(manifest_content.strip())
+
+        # 6. Write MainActivity.java
+        java_content = """package com.leon2119.cleanledger;
+        import android.os.Bundle;
+        import android.webkit.WebSettings;
+        import android.webkit.WebView;
+        import androidx.appcompat.app.AppCompatActivity;
+
+        public class MainActivity extends AppCompatActivity {
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                WebView webView = new WebView(this);
+                WebSettings settings = webView.getSettings();
+                settings.setJavaScriptEnabled(true);
+                settings.setDomStorageEnabled(true);
+                webView.loadUrl("file:///android_asset/index.html");
+                setContentView(webView);
+            }
+        }"""
+        with open("app/src/main/java/com/leon2119/cleanledger/MainActivity.java", "w", encoding="utf-8") as f:
+            f.write(java_content)
 
     - name: Generate Gradle Wrapper
       run: gradle wrapper
