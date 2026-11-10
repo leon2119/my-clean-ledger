@@ -386,6 +386,50 @@
         }
 
 initApp();
-          </script>
+              <script>
+    // <![CDATA[
+        // All your JavaScript logic stays safely in here
+        
+        function changePage(direction) {
+            state.pages[state.currentPage].topSpace = document.getElementById("top-space").value;
+            saveState();
+            state.currentPage += direction;
+            if (state.currentPage < 1) state.currentPage = 1;
+            ensurePageExists(state.currentPage);
+            renderPage();
+        }
+
+        function addNewPage() {
+            state.pages[state.currentPage].topSpace = document.getElementById("top-space").value;
+            const absoluteTotalPages = Object.keys(state.pages).length;
+            const newIndexIdx = absoluteTotalPages + 1;
+            ensurePageExists(newIndexIdx);
+            state.currentPage = newIndexIdx;
+            saveState();
+            renderPage();
+        }
+
+        document.getElementById("top-space").oninput = function() {
+            state.pages[state.currentPage].topSpace = this.value;
+            saveState();
+        };
+
+        function openGlobalValuesView() {
+            let msg = "Registered Dictionary Mappings:\n\n";
+            Object.keys(state.globalTemplates).forEach(col => {
+                msg += `[Column: ${col}]\n`;
+                Object.keys(state.globalTemplates[col]).forEach(w => {
+                    msg += `  "${w}" = ₹${state.globalTemplates[col][w]}\n`;
+                });
+            });
+            alert(msg);
+        }
+
+        initApp();
+    // ]]>
+    </script>
+</body>
+</html>
+
 </body>
 </html>
