@@ -1,0 +1,39 @@
+name: Build Mobile App
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js Environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Install Tools and Create App Container
+      run: |
+        npm install -g cordova
+        cordova create app com.leon2119.cleanledger LedgerBook
+        cd app
+        cordova platform add android@12.0.0 --save
+        rm -rf www/*
+        cp ../index.html www/index.html
+
+    - name: Compile Unsigned Release APK
+      run: |
+        cd app
+        cordova build android --release --no-daemon
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-apk
+        path: app/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
