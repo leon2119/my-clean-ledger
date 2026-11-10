@@ -477,7 +477,7 @@
         function hideSuggestionsLater() {
             setTimeout(() => { document.getElementById("global-suggest-box").style.display = "none"; }, 200);
         }
-        function openValueModal(headerName, word, row, col) {
+                function openValueModal(headerName, word, row, col) {
             activePromptContext = { headerName, word, row, col };
             document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
             document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency mapping rate:';
@@ -728,6 +728,7 @@
                     if (hasValue) tableRows.push(rowData);
                 }
 
+                // Fixed solid color code parameters to prevent compilation blanks
                 doc.autoTable({
                     startY: 90,
                     head: [tableHeaders],
