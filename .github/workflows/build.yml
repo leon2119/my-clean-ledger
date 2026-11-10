@@ -12,15 +12,14 @@ jobs:
       with:
         node-version: 20
 
-    - name: Set up JDK 17
+    - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
-        java-version: '17'
+        java-version: '21'
 
     - name: Scaffold App Asset Web Directory
       run: |
-        # Capacitor expects your code file inside a folder named 'www'
         mkdir www
         cp index.html www/index.html
 
@@ -40,7 +39,6 @@ jobs:
     - name: Disable Strict Package Linting Check
       run: |
         cd android
-        # Inject flags to force the compiler to skip strict XML attribute verification checks
         echo "android.useAndroidX=true" >> gradle.properties
         echo "android.enableJetifier=true" >> gradle.properties
         echo "org.gradle.dependency.verification=off" >> gradle.properties
