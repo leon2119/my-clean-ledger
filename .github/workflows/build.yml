@@ -22,90 +22,39 @@ jobs:
         cp index.html app/src/main/assets/index.html
 
         echo "include ':app'" > settings.gradle
-
         echo "android.useAndroidX=true" > gradle.properties
         echo "android.enableJetifier=true" >> gradle.properties
 
-        cat << 'EOF' > build.gradle
-        buildscript {
-            repositories { google(); mavenCentral() }
-            dependencies { classpath 'com.android.tools.build:gradle:8.2.1' }
-        }
-        allprojects {
-            repositories { google(); mavenCentral() }
-        }
-        EOF
-
-        cat << 'EOF' > app/build.gradle
-        plugins {
-            id 'com.android.application'
-        }
-        android {
-            namespace 'com.leon2119.cleanledger'
-            compileSdk 34
-            defaultConfig {
-                applicationId "com.leon2119.cleanledger"
-                minSdk 24
-                targetSdk 34
-                versionCode 1
-                versionName "1.0"
-            }
-            buildTypes {
-                release {
-                    minifyEnabled false
-                }
-            }
-        }
-        dependencies {
-            implementation 'androidx.appcompat:appcompat:1.6.1'
-        }
-        EOF
+        printf "buildscript {\n    repositories { google(); mavenCentral() }\n    dependencies { classpath 'com.android.tools.build:gradle:8.2.1' }\n}\nallprojects {\n    repositories { google(); mavenCentral() }\n}\n" > build.gradle
+        
+        printf "plugins {\n    id 'com.android.application'\n}\nandroid {\n    namespace 'com.leon2119.cleanledger'\n    compileSdk 34\n    defaultConfig {\n        applicationId \"com.leon2119.cleanledger\"\n        minSdk 24\n        targetSdk 34\n        versionCode 1\n        versionName \"1.0\"\n    }\n    buildTypes {\n        release {\n            minifyEnabled false\n        }\n    }\n}\ndependencies {\n    implementation 'androidx.appcompat:appcompat:1.6.1'\n}\n" > app/build.gradle
 
     - name: Build Android Manifest and Native Java Shell
       run: |
-        cat << 'EOF' > app/src/main/AndroidManifest.xml
-        <manifest xmlns:android="http://android.com">
-            <uses-permission android:name="android.permission.INTERNET" />
-            <application android:label="LedgerBook" android:theme="@style/Theme.AppCompat.Light.NoActionBar" android:hardwareAccelerated="true">
-                <activity android:name="com.leon2119.cleanledger.MainActivity" android:exported="true">
-                    <intent-filter>
-                        <action android:name="android.intent.action.MAIN" />
-                        <category android:name="android.intent.category.LAUNCHER" />
-                    </intent-filter>
-                </activity>
-            </application>
-        </manifest>
-        EOF
+        # Using a raw string block to prevent variable stripping
+        echo '<?xml version="1.0" encoding="utf-8"?>' > app/src/main/AndroidManifest.xml
+        echo '<manifest xmlns:android="http://android.com">' >> app/src/main/AndroidManifest.xml
+        echo '    <uses-permission android:name="android.permission.INTERNET" />' >> app/src/main/AndroidManifest.xml
+        echo '    <application android:label="LedgerBook" android:theme="@style/Theme.AppCompat.Light.NoActionBar" android:hardwareAccelerated="true">' >> app/src/main/AndroidManifest.xml
+        echo '        <activity android:name="com.leon2119.cleanledger.MainActivity" android:exported="true">' >> app/src/main/AndroidManifest.xml
+        echo '            <intent-filter>' >> app/src/main/AndroidManifest.xml
+        echo '                <action android:name="android.intent.action.MAIN" />' >> app/src/main/AndroidManifest.xml
+        echo '                <category android:name="android.intent.category.LAUNCHER" />' >> app/src/main/AndroidManifest.xml
+        echo '            </intent-filter>' >> app/src/main/AndroidManifest.xml
+        echo '        </activity>' >> app/src/main/AndroidManifest.xml
+        echo '    </application>' >> app/src/main/AndroidManifest.xml
+        echo '</manifest>' >> app/src/main/AndroidManifest.xml
 
-        cat << 'EOF' > app/src/main/java/com/leon2119/cleanledger/MainActivity.java
-        package com.leon2119.cleanledger;
-        import android.os.Bundle;
-        import android.webkit.WebSettings;
-        import android.webkit.WebView;
-        import androidx.appcompat.app.AppCompatActivity;
+        printf "package com.leon2119.cleanledger;\nimport android.os.Bundle;\nimport android.webkit.WebSettings;\nimport android.webkit.WebView;\nimport androidx.appcompat.app.AppCompatActivity;\npublic class MainActivity extends AppCompatActivity {\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        WebView webView = new WebView(this);\n        WebSettings settings = webView.getSettings();\n        settings.setJavaScriptEnabled(true);\n        settings.setDomStorageEnabled(true);\n        webView.loadUrl(\"file:///android_asset/index.html\");\n        setContentView(webView);\n    }\n}\n" > app/src/main/java/com/leon2119/cleanledger/MainActivity.java
 
-        public class MainActivity extends AppCompatActivity {
-            @Override
-            protected void onCreate(Bundle savedInstanceState) {
-                super.onCreate(savedInstanceState);
-                WebView webView = new WebView(this);
-                WebSettings settings = webView.getSettings();
-                settings.setJavaScriptEnabled(true);
-                settings.setDomStorageEnabled(true);
-                webView.loadUrl("file:///android_asset/index.html");
-                setContentView(webView);
-            }
-        }
-        EOF
+    - name: DIAGNOSTIC - Print Generated Manifest
+      run: |
+        echo "=== START OF GENERATED MANIFEST ==="
+        cat app/src/main/AndroidManifest.xml
+        echo "=== END OF GENERATED MANIFEST ==="
 
     - name: Generate Gradle Wrapper
       run: gradle wrapper
 
     - name: Compile Native Unsigned Release APK
       run: ./gradlew :app:assembleRelease --no-daemon
-
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release-apk
-        path: app/build/outputs/apk/release/app-release-unsigned.apk
