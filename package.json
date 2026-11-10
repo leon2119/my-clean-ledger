@@ -1,0 +1,9 @@
+{
+  "name": "com.leon2119.cleanledger",
+  "version": "1.0.0",
+  "description": "Dynamic Multi-Column Ledger App",
+  "main": "index.html",
+  "dependencies": {
+    "cordova-android": "^12.0.0"
+  }
+}
