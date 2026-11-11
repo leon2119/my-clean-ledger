@@ -163,16 +163,17 @@
         </div>
     </div>
 
-    <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
         <div id="rates-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
-    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 360px; width: 92%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-        <h3 style="font-size: 15px; margin-bottom: 10px;">Edit Assigned Value Rates</h3>
-        <div id="rates-list-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;"></div>
-        <div style="display: flex; justify-content: flex-end;">
-            <button class="secondary" onclick="closeModal('rates-modal')">Close</button>
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 360px; width: 92%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            <h3 style="font-size: 15px; margin-bottom: 10px;">Edit Assigned Value Rates</h3>
+            <div id="rates-list-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;"></div>
+            <div style="display: flex; justify-content: flex-end;">
+                <button class="secondary" onclick="closeModal('rates-modal')">Close</button>
+            </div>
         </div>
     </div>
-</div>
+
+    <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
         <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
             <h3 style="font-size: 15px; margin-bottom: 8px;">Clone Layout Structure</h3>
             <p style="font-size: 13px; color:#64748b; margin-bottom:10px;">This copies columns and headers to other pages.</p>
@@ -185,7 +186,8 @@
         </div>
     </div>
 
-            <script>
+
+               <script>
         let appData = {
             currentBookId: "November_2026",
             books: {
@@ -241,14 +243,17 @@
         function updateLockUI() {
             let book = getActiveBook();
             const btn = document.getElementById("lock-btn");
-            if (book.editLocked) { btn.innerText = "🔒 Lock: On"; btn.className = "warn active"; }
-            else { btn.innerText = "🔓 Lock: Off"; btn.className = "warn"; }
+            if (btn) {
+                if (book.editLocked) { btn.innerText = "🔒 Lock: On"; btn.className = "warn active"; }
+                else { btn.innerText = "🔓 Lock: Off"; btn.className = "warn"; }
+            }
             renderPage();
         }
 
         function toggleLeftDrawer(open) {
             const drawer = document.getElementById("left-drawer");
             const backdrop = document.getElementById("left-backdrop");
+            if (!drawer || !backdrop) return;
             if (open) {
                 renderLeftDrawerList(); backdrop.style.display = "block";
                 setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
@@ -261,11 +266,12 @@
         function renderLeftDrawerList() {
             let book = getActiveBook();
             const listContainer = document.getElementById("left-drawer-list");
+            if (!listContainer) return;
             listContainer.innerHTML = "";
             Object.keys(book.pages).sort((a, b) => a - b).forEach(pNum => {
                 const div = document.createElement("div");
                 div.className = "drawer-item" + (parseInt(pNum) === book.currentPage ? " active" : "");
-                let heading = book.pages[pNum].topSpace.trim();
+                let heading = (book.pages[pNum].topSpace || "").trim();
                 div.innerText = "Page " + pNum + (heading ? ": " + heading : " (Untitled)");
                 div.onclick = function() { jumpToPage(parseInt(pNum)); };
                 listContainer.appendChild(div);
@@ -281,6 +287,7 @@
         function toggleRightDrawer(open) {
             const drawer = document.getElementById("right-drawer");
             const backdrop = document.getElementById("right-backdrop");
+            if (!drawer || !backdrop) return;
             if (open) {
                 renderRightDrawerList(); backdrop.style.display = "block";
                 setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
@@ -292,6 +299,7 @@
 
         function renderRightDrawerList() {
             const listContainer = document.getElementById("right-drawer-list");
+            if (!listContainer) return;
             listContainer.innerHTML = "";
             Object.keys(appData.books).forEach(bId => {
                 const div = document.createElement("div");
@@ -331,7 +339,7 @@
                 let defaultColCount = 2; let defaultHeaders = ["Column 1", "Column 2"];
                 let keys = Object.keys(book.pages);
                 if (keys.length > 0) {
-                    let firstPage = book.pages[keys[0]];
+                    let firstPage = book.pages[keys];
                     defaultColCount = firstPage.headers.length; defaultHeaders = [...firstPage.headers];
                 }
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
@@ -427,9 +435,6 @@
             document.getElementById("modal-value-input").focus();
         }
 
-        document.getElementById("modal-btn-local").onclick = function() { savePromptedValue(true); };
-        document.getElementById("modal-btn-global").onclick = function() { savePromptedValue(false); };
-
         function savePromptedValue(isLocalOnly) {
             const numericValue = parseFloat(document.getElementById("modal-value-input").value);
             if (isNaN(numericValue)) { alert("Please enter a valid number."); return; }
@@ -468,6 +473,7 @@
             if (!foundAny) {
                 container.innerHTML = '<p style="font-size:13px; color:#64748b;">No assigned rates yet. Type an entry into a cell first.</p>';
             }
+            closeModal('value-modal'); closeModal('clone-modal');
             document.getElementById("rates-modal").style.display = "flex";
         }
 
@@ -595,61 +601,54 @@
             touchStartX = 0; touchEndX = 0;
         }
 
-        async function openPrintPreview() {
-            let book = getActiveBook();
-            const pageData = book.pages[book.currentPage];
-            let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
-            let bookTitle = appData.currentBookId.replace("_", " ");
-
-            let lines = [
-                "LEDGER REPORT: " + bookTitle,
-                "Page No: " + book.currentPage + " | Notes: " + title,
-                "------------------------------------------------------------",
-                "Day | " + pageData.headers.join(" | "),
-                "------------------------------------------------------------"
-            ];
-
-            for (let r = 0; r < 31; r++) {
-                let rowVals = []; let hasData = false;
-                for (let c = 0; c < pageData.headers.length; c++) {
-                    let v = (pageData.grid[r]?.[c] || "").replace(/[^\x20-\x7E]/g, "");
-                    if (v !== "") hasData = true;
-                    rowVals.push(v || "-");
-                }
-                if (hasData) lines.push("Day " + (r + 1) + " | " + rowVals.join(" | "));
-            }
-
-            lines.push("------------------------------------------------------------");
-            let totalText = document.getElementById("grand-total-output").innerText.replace("₹", "Rs. ");
-            lines.push(totalText);
-
-            let pdfBase64 = buildSimplePdfBase64(lines);
-            let fileName = "Ledger_" + appData.currentBookId + "_P" + book.currentPage + ".pdf";
-
+        function openPrintPreview() {
             try {
-                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-                    const { Filesystem } = window.Capacitor.Plugins;
-                    await Filesystem.writeFile({
-                        path: fileName,
-                        data: pdfBase64,
-                        directory: "DATA"
-                    });
-                    alert("✅ PDF Created Successfully!\n\nSaved inside app storage:\nAndroid/data/com.leon2119.cleanledger/files/" + fileName);
-                    return;
-                }
-            } catch (err) {
-                alert("PDF Save Error: " + err.message);
-            }
+                let book = getActiveBook();
+                const pageData = book.pages[book.currentPage];
+                let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
+                let bookTitle = appData.currentBookId.replace("_", " ");
 
-            const link = document.createElement("a");
-            link.href = "data:application/pdf;base64," + pdfBase64;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+                let lines = [
+                    "LEDGER REPORT: " + bookTitle,
+                    "Page No: " + book.currentPage + " | Notes: " + title,
+                    "------------------------------------------------------------",
+                    "Day | " + pageData.headers.join(" | "),
+                    "------------------------------------------------------------"
+                ];
+
+                for (let r = 0; r < 31; r++) {
+                    let rowVals = []; let hasData = false;
+                    for (let c = 0; c < pageData.headers.length; c++) {
+                        let v = (pageData.grid[r]?.[c] || "").replace(/[^\x20-\x7E]/g, "");
+                        if (v !== "") hasData = true;
+                        rowVals.push(v || "-");
+                    }
+                    if (hasData) lines.push("Day " + (r + 1) + " | " + rowVals.join(" | "));
+                }
+
+                lines.push("------------------------------------------------------------");
+                let totalText = document.getElementById("grand-total-output").innerText.replace("₹", "Rs. ");
+                lines.push(totalText);
+
+                let pdfString = buildSimplePdfString(lines);
+                let fileName = "Ledger_" + appData.currentBookId + "_P" + book.currentPage + ".pdf";
+
+                let blob = new Blob([pdfString], { type: "application/pdf" });
+                let url = URL.createObjectURL(blob);
+                let link = document.createElement("a");
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                alert("✅ PDF File Downloaded: " + fileName);
+            } catch (err) {
+                alert("PDF Error: " + err.message);
+            }
         }
 
-        function buildSimplePdfBase64(lines) {
+        function buildSimplePdfString(lines) {
             let content = "BT /F1 11 Tf 40 780 Td 16 TL ";
             lines.forEach(line => {
                 let safe = line.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -675,7 +674,7 @@
                 pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
             }
             pdf += "trailer << /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefPos + "\n%%EOF";
-            return btoa(pdf);
+            return pdf;
         }
 
         function closePrintPreview() {
