@@ -35,6 +35,19 @@ jobs:
 
     - name: Sync App Interface into Android Wrapper
       run: npx cap sync android
+      
+    - name: Configure Android FileProvider for PDF Sharing
+      run: |
+        mkdir -p android/app/src/main/res/xml
+        cat << 'EOF' > android/app/src/main/res/xml/file_paths.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <paths xmlns:android="http://android.com">
+            <cache-path name="my_cache_images" path="." />
+            <files-path name="my_files" path="." />
+            <external-cache-path name="my_external_cache" path="." />
+        </paths>
+        EOF
+
 
     - name: Patch Gradle Duplication Conflict Configurations
       run: |
