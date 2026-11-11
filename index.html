@@ -185,7 +185,7 @@
         </div>
     </div>
 
-        <script>
+            <script>
         let appData = {
             currentBookId: "November_2026",
             books: {
@@ -205,13 +205,14 @@
             if (window.localStorage && localStorage.getItem("ledger_archive_master")) {
                 appData = JSON.parse(localStorage.getItem("ledger_archive_master"));
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {}
 
         function saveState() {
             try { if (window.localStorage) localStorage.setItem("ledger_archive_master", JSON.stringify(appData)); } catch (e) {}
         }
 
         function getActiveBook() {
+            if (!appData.books) appData.books = {};
             if (!appData.books[appData.currentBookId]) {
                 appData.books[appData.currentBookId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
             }
@@ -336,7 +337,6 @@
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
             }
         }
-
         function handleCellKey(e, el) {
             if (e.key === "Enter" || e.keyCode === 13) el.blur();
         }
@@ -378,6 +378,7 @@
         function updateHeader(colIndex, newTitle) {
             pushToUndo(); let book = getActiveBook(); book.pages[book.currentPage].headers[colIndex] = newTitle; saveState();
         }
+
         function handleCellEdit(row, col, value) {
             let book = getActiveBook(); value = value.trim();
             if (!book.pages[book.currentPage].grid[row]) book.pages[book.currentPage].grid[row] = [];
@@ -498,7 +499,6 @@
             const el = document.getElementById(id);
             if (el) el.style.display = "none";
         }
-
         function calculateTotals() {
             let book = getActiveBook(); const pageData = book.pages[book.currentPage]; let counts = {}; let grandTotal = 0;
             pageData.headers.forEach((headerName, colIdx) => {
@@ -632,14 +632,21 @@
                     await Filesystem.writeFile({
                         path: fileName,
                         data: pdfBase64,
-                        directory: "DOCUMENTS"
+                        directory: "DATA"
                     });
-                    alert("✅ PDF Saved Successfully!\n\nOpen File Manager -> Documents folder:\n" + fileName);
+                    alert("✅ PDF Created Successfully!\n\nSaved inside app storage:\nAndroid/data/com.leon2119.cleanledger/files/" + fileName);
                     return;
                 }
             } catch (err) {
                 alert("PDF Save Error: " + err.message);
             }
+
+            const link = document.createElement("a");
+            link.href = "data:application/pdf;base64," + pdfBase64;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function buildSimplePdfBase64(lines) {
@@ -680,4 +687,3 @@
     </script>
 </body>
 </html>
-
