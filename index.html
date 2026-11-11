@@ -359,7 +359,7 @@
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
             }
         }
-                function renderPage() {
+                        function renderPage() {
             let book = getActiveBook(); const pageData = book.pages[book.currentPage];
             document.getElementById("page-indicator").innerText = "P. " + book.currentPage;
             const topSpaceInput = document.getElementById("top-space");
@@ -384,7 +384,7 @@
                     for (let c = 0; c < pageData.headers.length; c++) {
                         const td = document.createElement("td"); const val = pageData.grid[r] && pageData.grid[r][c] !== undefined ? pageData.grid[r][c] : "";
                         const disabledAttr = book.editLocked ? 'disabled' : '';
-                        td.innerHTML = '<input type="text" class="cell-input" value="' + val + '" onkeydown="if(event.key===\'Enter\'){this.blur();}" oninput="showSuggestions(this, ' + r + ', ' + c + ')" onblur="hideSuggestionsLater()" onchange="handleCellEdit(' + r + ', ' + c + ', this.value)" ' + disabledAttr + ' />';
+                        td.innerHTML = '<input type="text" class="cell-input" value="' + val + '" onkeydown="if(event.key===\'Enter\' || event.keyCode===13){this.blur();}" oninput="showSuggestions(this, ' + r + ', ' + c + ')" onblur="hideSuggestionsLater(); handleCellEdit(' + r + ', ' + c + ', this.value);" ' + disabledAttr + ' />';
                         tr.appendChild(td);
                     }
                     tbody.appendChild(tr);
@@ -392,6 +392,7 @@
             }
             calculateTotals();
         }
+
 
         function updateHeader(colIndex, newTitle) {
             pushToUndo(); let book = getActiveBook(); book.pages[book.currentPage].headers[colIndex] = newTitle; saveState();
@@ -658,7 +659,7 @@
             touchStartX = 0; touchEndX = 0;
         }
 
-                async function openPrintPreview() {
+                        async function openPrintPreview() {
             let book = getActiveBook();
             const pageData = book.pages[book.currentPage];
             let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
@@ -691,21 +692,19 @@
 
             try {
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-                    const { Filesystem, Share } = window.Capacitor.Plugins;
-                    const saved = await Filesystem.writeFile({
+                    const { Filesystem } = window.Capacitor.Plugins;
+                    await Filesystem.writeFile({
                         path: fileName,
                         data: pdfBase64,
-                        directory: "CACHE"
+                        directory: "DOCUMENTS"
                     });
-                    await Share.share({
-                        title: fileName,
-                        url: saved.uri
-                    });
+                    alert("✅ PDF Saved Successfully!\n\nOpen your phone's File Manager -> Documents folder to view or share:\n" + fileName);
                     return;
                 }
             } catch (err) {
                 alert("PDF Save Error: " + err.message);
             }
+        }
 
             const link = document.createElement("a");
             link.href = "data:application/pdf;base64," + pdfBase64;
