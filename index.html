@@ -151,7 +151,7 @@
         <div class="drawer-list" id="right-drawer-list"></div>
     </div>
 
-    <div id="value-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div id="value-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000; opacity: 1;">
         <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
             <h3 id="modal-title" style="font-size: 15px; margin-bottom: 8px;">Define Value</h3>
             <p id="modal-description" style="font-size: 13px; color:#64748b; margin-bottom:12px;"></p>
@@ -163,7 +163,7 @@
         </div>
     </div>
 
-        <div id="rates-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+            <div id="rates-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000; opacity: 1;">
         <div style="background: white; padding: 20px; border-radius: 8px; max-width: 360px; width: 92%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
             <h3 style="font-size: 15px; margin-bottom: 10px;">Edit Assigned Value Rates</h3>
             <div id="rates-list-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;"></div>
@@ -173,7 +173,7 @@
         </div>
     </div>
 
-    <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000; opacity: 1;">
         <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
             <h3 style="font-size: 15px; margin-bottom: 8px;">Clone Layout Structure</h3>
             <p style="font-size: 13px; color:#64748b; margin-bottom:10px;">This copies columns and headers to other pages.</p>
@@ -624,37 +624,56 @@ function openRatesEditor() {
             touchStartX = 0; touchEndX = 0;
         }
 
-                       async function openPrintPreview() {
+                              async function openPrintPreview() {
             try {
-                let hasCap = !!window.Capacitor;
-                let plugins = window.Capacitor && window.Capacitor.Plugins ? Object.keys(window.Capacitor.Plugins).join(", ") : "NONE";
-                alert("🔍 PDF DIAGNOSTIC:\nCapacitor loaded: " + hasCap + "\nAvailable Plugins: " + plugins);
-
                 let book = getActiveBook();
                 const pageData = book.pages[book.currentPage];
-                let lines = ["LEDGER REPORT: " + appData.currentBookId, "Page: " + book.currentPage];
+                let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
+                let bookTitle = appData.currentBookId.replace("_", " ");
+
+                let lines = [
+                    "LEDGER REPORT: " + bookTitle,
+                    "Page No: " + book.currentPage + " | Notes: " + title,
+                    "------------------------------------------------------------",
+                    "Day | " + pageData.headers.join(" | "),
+                    "------------------------------------------------------------"
+                ];
+
+                for (let r = 0; r < 31; r++) {
+                    let rowVals = []; let hasData = false;
+                    for (let c = 0; c < pageData.headers.length; c++) {
+                        let v = (pageData.grid[r]?.[c] || "").replace(/[^\x20-\x7E]/g, "");
+                        if (v !== "") hasData = true;
+                        rowVals.push(v || "-");
+                    }
+                    if (hasData) lines.push("Day " + (r + 1) + " | " + rowVals.join(" | "));
+                }
+
+                lines.push("------------------------------------------------------------");
+                let totalText = document.getElementById("grand-total-output").innerText.replace("₹", "Rs. ");
+                lines.push(totalText);
+
                 let pdfString = buildSimplePdfString(lines);
                 let pdfBase64 = btoa(pdfString);
-                let fileName = "Ledger_Test.pdf";
+                let fileName = "Ledger_" + appData.currentBookId + "_P" + book.currentPage + ".pdf";
 
-                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-                    const { Filesystem, Share } = window.Capacitor.Plugins;
-                    const saved = await Filesystem.writeFile({
-                        path: fileName,
-                        data: pdfBase64,
-                        directory: "CACHE"
-                    });
-                    alert("✅ File written to: " + saved.uri);
-                    if (Share) {
-                        await Share.share({ title: fileName, url: saved.uri });
-                    }
-                } else {
-                    alert("❌ Filesystem plugin NOT found in Capacitor!");
-                }
+                const { Filesystem, Share } = window.Capacitor.Plugins;
+                const saved = await Filesystem.writeFile({
+                    path: fileName,
+                    data: pdfBase64,
+                    directory: "CACHE"
+                });
+
+                await Share.share({
+                    title: fileName,
+                    files: [saved.uri],
+                    dialogTitle: "Save or Share Ledger PDF"
+                });
             } catch (err) {
-                alert("❌ PDF Exact Error: " + (err.message || JSON.stringify(err)));
+                alert("❌ PDF Error: " + (err.message || JSON.stringify(err)));
             }
         }
+
 
 
         function buildSimplePdfString(lines) {
