@@ -30,24 +30,45 @@ jobs:
 
     - name: Install Android Platform Extensions
       run: |
-        npm install @capacitor/android @capacitor/filesystem @capacitor/share
+        npm install @capacitor/android
         npx cap add android
 
     - name: Sync App Interface into Android Wrapper
       run: npx cap sync android
-      
-    - name: Configure Android FileProvider for PDF Sharing
-      run: |
-        mkdir -p android/app/src/main/res/xml
-        cat << 'EOF' > android/app/src/main/res/xml/file_paths.xml
-        <?xml version="1.0" encoding="utf-8"?>
-        <paths xmlns:android="http://android.com">
-            <cache-path name="my_cache_images" path="." />
-            <files-path name="my_files" path="." />
-            <external-cache-path name="my_external_cache" path="." />
-        </paths>
-        EOF
 
+    - name: Inject Native Android Print & PDF Saver into MainActivity
+      run: |
+        cat << 'EOF' > android/app/src/main/java/com/leon2119/cleanledger/MainActivity.java
+        package com.leon2119.cleanledger;
+
+        import android.content.Context;
+        import android.os.Bundle;
+        import android.print.PrintAttributes;
+        import android.print.PrintDocumentAdapter;
+        import android.print.PrintManager;
+        import android.webkit.JavascriptInterface;
+        import com.getcapacitor.BridgeActivity;
+
+        public class MainActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                this.bridge.getWebView().addJavascriptInterface(new Object() {
+                    @JavascriptInterface
+                    public void printPage(final String jobName) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                                PrintDocumentAdapter adapter = bridge.getWebView().createPrintDocumentAdapter(jobName);
+                                pm.print(jobName, adapter, new PrintAttributes.Builder().build());
+                            }
+                        });
+                    }
+                }, "AndroidPrinter");
+            }
+        }
+        EOF
 
     - name: Patch Gradle Duplication Conflict Configurations
       run: |
