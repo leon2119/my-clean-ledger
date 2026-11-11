@@ -28,10 +28,11 @@ jobs:
         npm install @capacitor/core @capacitor/cli
         npx cap init LedgerBook com.leon2119.cleanledger --web-dir=www
 
-    - name: Install Android Platform Extensions
+        - name: Install Android Platform Extensions
       run: |
-        npm install @capacitor/android
+        npm install @capacitor/android @capacitor/filesystem @capacitor/share
         npx cap add android
+
 
     - name: Sync App Interface into Android Wrapper
       run: npx cap sync android
