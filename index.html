@@ -121,7 +121,223 @@
     </div>
 
     <div id="global-suggest-box" class="suggest-box"></div>
-        function initApp() {
+    <div id="left-backdrop" class="drawer-backdrop" onclick="toggleLeftDrawer(false)"></div>
+    <div id="left-drawer" class="drawer">
+        <div class="drawer-header">
+            <span>📖 Book Pages</span>
+            <button class="secondary" style="padding: 4px 8px;" onclick="toggleLeftDrawer(false)">✕</button>
+        </div>
+        <div class="drawer-list" id="left-drawer-list"></div>
+        <button class="secondary" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="addNewPage()">➕ Create Blank Page</button>
+    </div>
+
+    <div id="right-backdrop" class="drawer-backdrop" onclick="toggleRightDrawer(false)"></div>
+    <div id="right-drawer" class="drawer">
+        <div class="drawer-header">
+            <span>📅 Archive Books Ledger</span>
+            <button class="secondary" style="padding: 4px 8px;" onclick="toggleRightDrawer(false)">✕</button>
+        </div>
+        <div style="display: flex; gap: 4px; margin-bottom: 12px;">
+            <select id="new-book-month" style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid var(--border); font-size:12px;">
+                <option value="January">Jan</option><option value="February">Feb</option><option value="March">Mar</option>
+                <option value="April">Apr</option><option value="May">May</option><option value="June">June</option>
+                <option value="July">July</option><option value="August">Aug</option><option value="September">Sept</option>
+                <option value="October">Oct</option><option value="November" selected>Nov</option><option value="December">Dec</option>
+            </select>
+            <input type="number" id="new-book-year" value="2026" style="width: 70px; padding: 6px; border-radius: 4px; border: 1px solid var(--border); font-size:12px;" />
+            <button onclick="createNewBookArchive()" style="padding: 6px 10px; font-size:12px;">+ Add</button>
+        </div>
+        <div class="drawer-list" id="right-drawer-list"></div>
+    </div>
+
+    <div id="value-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            <h3 id="modal-title" style="font-size: 15px; margin-bottom: 8px;">Define Value</h3>
+            <p id="modal-description" style="font-size: 13px; color:#64748b; margin-bottom:12px;"></p>
+            <input type="number" id="modal-value-input" placeholder="Enter Value in Rupees" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; margin-bottom:15px; font-size:14px;" />
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button class="secondary" id="modal-btn-local" onclick="savePromptedValue(true)">Save for THIS PAGE Only</button>
+                <button id="modal-btn-global" onclick="savePromptedValue(false)">Save GLOBALLY for this Column</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            <h3 style="font-size: 15px; margin-bottom: 8px;">Clone Layout Structure</h3>
+            <p style="font-size: 13px; color:#64748b; margin-bottom:10px;">This copies columns and headers to other pages.</p>
+            <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Apply up to which Page Number?</label>
+            <input type="number" id="clone-target-page" min="1" value="5" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; margin-bottom:15px;" />
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button class="secondary" onclick="closeModal('clone-modal')">Cancel</button>
+                <button onclick="executeLayoutClone()">Apply Structure</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let appData = {
+            currentBookId: "November_2026",
+            books: {
+                "November_2026": {
+                    currentPage: 1,
+                    globalTemplates: {},
+                    editLocked: false,
+                    pages: {
+                        1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} }
+                    }
+                }
+            }
+        };
+
+        let undoStack = [];
+        let activePromptContext = null;
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        try {
+            if (window.localStorage && localStorage.getItem("ledger_archive_master")) {
+                appData = JSON.parse(localStorage.getItem("ledger_archive_master"));
+                if (!appData.currentBookId) appData.currentBookId = "November_2026";
+                if (!appData.books) appData.books = {};
+                if (!appData.books[appData.currentBookId]) {
+                    appData.books[appData.currentBookId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
+                }
+            }
+        } catch(e) { console.error("Storage lookup crashed", e); }
+
+        function saveState() {
+            try {
+                if (window.localStorage) localStorage.setItem("ledger_archive_master", JSON.stringify(appData));
+            } catch(e) { console.error("Write error", e); }
+        }
+
+        function getActiveBook() {
+            return appData.books[appData.currentBookId];
+        }
+
+        function pushToUndo() {
+            undoStack.push(JSON.stringify(getActiveBook()));
+            if (undoStack.length > 20) undoStack.shift();
+        }
+
+        function triggerUndo() {
+            let book = getActiveBook();
+            if (book.editLocked) { alert("App is locked. Turn lock off to undo."); return; }
+            if (undoStack.length === 0) { alert("Nothing to undo."); return; }
+            appData.books[appData.currentBookId] = JSON.parse(undoStack.pop());
+            saveState();
+            renderPage();
+        }
+
+        function toggleEditLock() {
+            let book = getActiveBook();
+            book.editLocked = !book.editLocked;
+            saveState();
+            updateLockUI();
+        }
+
+        function updateLockUI() {
+            let book = getActiveBook();
+            const btn = document.getElementById("lock-btn");
+            if (book.editLocked) {
+                btn.innerText = "🔒 Lock: On";
+                btn.className = "warn active";
+            } else {
+                btn.innerText = "🔓 Lock: Off";
+                btn.className = "warn";
+            }
+            renderPage();
+        }
+
+        function toggleLeftDrawer(open) {
+            const drawer = document.getElementById("left-drawer");
+            const backdrop = document.getElementById("left-backdrop");
+            if (open) {
+                renderLeftDrawerList();
+                backdrop.style.display = "block";
+                setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
+            } else {
+                drawer.classList.remove("open");
+                backdrop.style.opacity = "0";
+                setTimeout(() => { backdrop.style.display = "none"; }, 200);
+            }
+        }
+
+        function renderLeftDrawerList() {
+            let book = getActiveBook();
+            const listContainer = document.getElementById("left-drawer-list");
+            listContainer.innerHTML = "";
+            Object.keys(book.pages).sort((a,b) => a-b).forEach(pNum => {
+                const div = document.createElement("div");
+                div.className = "drawer-item" + (parseInt(pNum) === book.currentPage ? " active" : "");
+                let heading = book.pages[pNum].topSpace.trim();
+                div.innerText = "Page " + pNum + (heading ? ": " + heading : " (Untitled Page)");
+                div.onclick = function() { jumpToPage(parseInt(pNum)); };
+                listContainer.appendChild(div);
+            });
+        }
+
+        function jumpToPage(pNum) {
+            let book = getActiveBook();
+            book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
+            book.currentPage = pNum;
+            saveState();
+            toggleLeftDrawer(false);
+            renderPage();
+        }
+
+        function toggleRightDrawer(open) {
+            const drawer = document.getElementById("right-drawer");
+            const backdrop = document.getElementById("right-backdrop");
+            if (open) {
+                renderRightDrawerList();
+                backdrop.style.display = "block";
+                setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
+            } else {
+                drawer.classList.remove("open");
+                backdrop.style.opacity = "0";
+                setTimeout(() => { backdrop.style.display = "none"; }, 200);
+            }
+        }
+
+        function renderRightDrawerList() {
+            const listContainer = document.getElementById("right-drawer-list");
+            listContainer.innerHTML = "";
+            Object.keys(appData.books).forEach(bId => {
+                const div = document.createElement("div");
+                div.className = "drawer-item" + (bId === appData.currentBookId ? " active" : "");
+                div.innerText = "📅 " + bId.replace("_", " ");
+                div.onclick = function() { switchActiveBook(bId); };
+                listContainer.appendChild(div);
+            });
+        }
+
+        function createNewBookArchive() {
+            const m = document.getElementById("new-book-month").value;
+            const y = document.getElementById("new-book-year").value;
+            const newId = m + "_" + y;
+            if (appData.books[newId]) { alert("This monthly ledger book profile already exists."); return; }
+            appData.books[newId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
+            appData.currentBookId = newId;
+            saveState();
+            renderRightDrawerList();
+            toggleRightDrawer(false);
+            renderPage();
+            updateLockUI();
+        }
+
+        function switchActiveBook(bId) {
+            let currentBook = getActiveBook();
+            currentBook.pages[currentBook.currentPage].topSpace = document.getElementById("top-space").value;
+            appData.currentBookId = bId;
+            saveState();
+            toggleRightDrawer(false);
+            renderPage();
+            updateLockUI();
+        }
+
+    function initApp() {
             let book = getActiveBook();
             ensurePageExists(book.currentPage);
             updateLockUI();
