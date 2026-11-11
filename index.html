@@ -624,7 +624,7 @@ function openRatesEditor() {
             touchStartX = 0; touchEndX = 0;
         }
 
-                              async function openPrintPreview() {
+                                     async function openPrintPreview() {
             try {
                 let book = getActiveBook();
                 const pageData = book.pages[book.currentPage];
@@ -648,6 +648,14 @@ function openRatesEditor() {
                     }
                     if (hasData) lines.push("Day " + (r + 1) + " | " + rowVals.join(" | "));
                 }
+
+                lines.push("------------------------------------------------------------");
+                lines.push("SUMMARY BREAKDOWN:");
+                let breakdownLines = document.getElementById("breakdown-output").innerText.split("\n");
+                breakdownLines.forEach(b => {
+                    let cleanB = b.replace(/[^\x20-\x7E]/g, "Rs. ").trim();
+                    if (cleanB) lines.push(cleanB);
+                });
 
                 lines.push("------------------------------------------------------------");
                 let totalText = document.getElementById("grand-total-output").innerText.replace("₹", "Rs. ");
