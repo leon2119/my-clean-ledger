@@ -359,21 +359,17 @@
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
             }
         }
-        function renderPage() {
-            let book = getActiveBook();
-            const pageData = book.pages[book.currentPage];
+                function renderPage() {
+            let book = getActiveBook(); const pageData = book.pages[book.currentPage];
             document.getElementById("page-indicator").innerText = "P. " + book.currentPage;
-            
             const topSpaceInput = document.getElementById("top-space");
-            topSpaceInput.value = pageData.topSpace || "";
-            topSpaceInput.disabled = book.editLocked;
+            topSpaceInput.value = pageData.topSpace || ""; topSpaceInput.disabled = book.editLocked;
 
             const headerRow = document.getElementById("header-row");
             if (headerRow) {
                 headerRow.innerHTML = '<th class="day-col">Day</th>';
                 pageData.headers.forEach((headerText, colIndex) => {
-                    const th = document.createElement("th");
-                    const disabledAttr = book.editLocked ? 'disabled' : '';
+                    const th = document.createElement("th"); const disabledAttr = book.editLocked ? 'disabled' : '';
                     th.innerHTML = '<div class="column-header-container"><input type="text" class="column-header-input" value="' + headerText + '" onchange="updateHeader(' + colIndex + ', this.value)" ' + disabledAttr + '></div>';
                     headerRow.appendChild(th);
                 });
@@ -383,17 +379,12 @@
             if (tbody) {
                 tbody.innerHTML = "";
                 for (let r = 0; r < 31; r++) {
-                    const tr = document.createElement("tr");
-                    const dayTd = document.createElement("td");
-                    dayTd.className = "day-col";
-                    dayTd.innerText = r + 1;
-                    tr.appendChild(dayTd);
-
+                    const tr = document.createElement("tr"); const dayTd = document.createElement("td");
+                    dayTd.className = "day-col"; dayTd.innerText = r + 1; tr.appendChild(dayTd);
                     for (let c = 0; c < pageData.headers.length; c++) {
-                        const td = document.createElement("td");
-                        const val = pageData.grid[r] && pageData.grid[r][c] !== undefined ? pageData.grid[r][c] : "";
+                        const td = document.createElement("td"); const val = pageData.grid[r] && pageData.grid[r][c] !== undefined ? pageData.grid[r][c] : "";
                         const disabledAttr = book.editLocked ? 'disabled' : '';
-                        td.innerHTML = '<input type="text" class="cell-input" value="' + val + '" oninput="showSuggestions(this, ' + r + ', ' + c + ')" onblur="hideSuggestionsLater()" onchange="handleCellEdit(' + r + ', ' + c + ', this.value)" ' + disabledAttr + ' />';
+                        td.innerHTML = '<input type="text" class="cell-input" value="' + val + '" onkeydown="if(event.key===\'Enter\'){this.blur();}" oninput="showSuggestions(this, ' + r + ', ' + c + ')" onblur="hideSuggestionsLater()" onchange="handleCellEdit(' + r + ', ' + c + ', this.value)" ' + disabledAttr + ' />';
                         tr.appendChild(td);
                     }
                     tbody.appendChild(tr);
@@ -403,31 +394,19 @@
         }
 
         function updateHeader(colIndex, newTitle) {
-            pushToUndo();
-            let book = getActiveBook();
-            book.pages[book.currentPage].headers[colIndex] = newTitle;
-            saveState();
+            pushToUndo(); let book = getActiveBook(); book.pages[book.currentPage].headers[colIndex] = newTitle; saveState();
         }
 
         function handleCellEdit(row, col, value) {
-            let book = getActiveBook();
-            value = value.trim();
+            let book = getActiveBook(); value = value.trim();
             if (!book.pages[book.currentPage].grid[row]) book.pages[book.currentPage].grid[row] = [];
             if (book.pages[book.currentPage].grid[row][col] === value) return;
-            
-            pushToUndo();
-            book.pages[book.currentPage].grid[row][col] = value;
-            saveState();
-
+            pushToUndo(); book.pages[book.currentPage].grid[row][col] = value; saveState();
             if (value === "") { calculateTotals(); return; }
-
-            // FIRST VERSION COMPATIBILITY RULE: Ignore pure numeric inputs to prevent popups for numbers
-            if (!isNaN(value)) { calculateTotals(); return; }
 
             const headerName = book.pages[book.currentPage].headers[col];
             const pageOverride = book.pages[book.currentPage].overrides[headerName]?.[value];
             const globalValue = book.globalTemplates[headerName]?.[value];
-
             if (pageOverride === undefined && globalValue === undefined) {
                 openValueModal(headerName, value, row, col);
             } else {
@@ -679,39 +658,93 @@
             touchStartX = 0; touchEndX = 0;
         }
 
-        function openPrintPreview() {
+                async function openPrintPreview() {
             let book = getActiveBook();
             const pageData = book.pages[book.currentPage];
-            let headingText = pageData.topSpace.trim() || "Untitled Page Ledger";
-            
-            let htmlHTML = '<h2>LEDGER REPORT: ' + appData.currentBookId.replace("_", " ") + '</h2>';
-            htmlHTML += '<p><strong>Page No:</strong> ' + book.currentPage + ' | <strong>Notes:</strong> ' + headingText + '</p>';
-            htmlHTML += '<table class="print-table"><thead><tr><th>Day</th>';
-            
-            pageData.headers.forEach(h => { htmlHTML += '<th>' + h + '</th>'; });
-            htmlHTML += '</tr></thead><tbody>';
-            
+            let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
+            let bookTitle = appData.currentBookId.replace("_", " ");
+
+            let lines = [
+                "LEDGER REPORT: " + bookTitle,
+                "Page No: " + book.currentPage + " | Notes: " + title,
+                "------------------------------------------------------------",
+                "Day | " + pageData.headers.join(" | "),
+                "------------------------------------------------------------"
+            ];
+
             for (let r = 0; r < 31; r++) {
-                let rowHTML = '<tr><td>' + (r + 1) + '</td>';
-                let hasData = false;
+                let rowVals = []; let hasData = false;
                 for (let c = 0; c < pageData.headers.length; c++) {
-                    let cellVal = pageData.grid[r]?.[c] || "";
-                    if (cellVal !== "") hasData = true;
-                    rowHTML += '<td>' + cellVal + '</td>';
+                    let v = (pageData.grid[r]?.[c] || "").replace(/[^\x20-\x7E]/g, "");
+                    if (v !== "") hasData = true;
+                    rowVals.push(v || "-");
                 }
-                rowHTML += '</tr>';
-                if (hasData) htmlHTML += rowHTML;
+                if (hasData) lines.push("Day " + (r + 1) + " | " + rowVals.join(" | "));
             }
-            
-            htmlHTML += '</tbody></table>';
-            htmlHTML += '<div style="margin-top:15px; padding:10px; background:#f1f5f9; border-radius:6px;">';
-            htmlHTML += '<strong>Breakdown Records Summary:</strong><br>' + document.getElementById("breakdown-output").innerHTML;
-            htmlHTML += '<br><span style="font-size:14px; font-weight:bold; color:#1e3a8a;">' + document.getElementById("grand-total-output").innerText + '</span>';
-            htmlHTML += '</div>';
-            
-            document.getElementById("print-document-target").innerHTML = htmlHTML;
-            document.getElementById("main-app-content").style.display = "none";
-            document.getElementById("print-view-overlay").style.display = "flex";
+
+            lines.push("------------------------------------------------------------");
+            let totalText = document.getElementById("grand-total-output").innerText.replace("₹", "Rs. ");
+            lines.push(totalText);
+
+            let pdfBase64 = buildSimplePdfBase64(lines);
+            let fileName = "Ledger_" + appData.currentBookId + "_P" + book.currentPage + ".pdf";
+
+            try {
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+                    const { Filesystem, Share } = window.Capacitor.Plugins;
+                    const saved = await Filesystem.writeFile({
+                        path: fileName,
+                        data: pdfBase64,
+                        directory: "CACHE"
+                    });
+                    await Share.share({
+                        title: fileName,
+                        url: saved.uri
+                    });
+                    return;
+                }
+            } catch (err) {
+                alert("PDF Save Error: " + err.message);
+            }
+
+            const link = document.createElement("a");
+            link.href = "data:application/pdf;base64," + pdfBase64;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function buildSimplePdfBase64(lines) {
+            let content = "BT /F1 11 Tf 40 780 Td 16 TL ";
+            lines.forEach(line => {
+                let safe = line.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+                content += "(" + safe + ") Tj T* ";
+            });
+            content += "ET";
+
+            let objects = [
+                "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+                "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+                "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n",
+                "4 0 obj << /Length " + content.length + " >> stream\n" + content + "\nendstream endobj\n",
+                "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Courier >> endobj\n"
+            ];
+
+            let pdf = "%PDF-1.4\n";
+            let offsets =;
+            objects.forEach(obj => {
+                offsets.push(pdf.length);
+                pdf += obj;
+            });
+
+            let xrefPos = pdf.length;
+            pdf += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
+            for (let i = 1; i < offsets.length; i++) {
+                pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+            }
+            pdf += "trailer << /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefPos + "\n%%EOF";
+            return btoa(pdf);
         }
 
         function closePrintPreview() {
