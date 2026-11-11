@@ -93,6 +93,7 @@
             <button class="danger" onclick="deleteLastColumn()">❌ Del Col</button>
             <button class="secondary" onclick="openCloneModal()">📋 Clone Template</button>
             <button style="background-color: #8b5cf6;" onclick="openPrintPreview()">📥 Save PDF / Print</button>
+            <button style="background-color: #0ea5e9;" onclick="openRatesEditor()">✏️ Edit Rates</button>
         </div>
 
         <div class="grid-container">
@@ -163,6 +164,15 @@
     </div>
 
     <div id="clone-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+        <div id="rates-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000;">
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 360px; width: 92%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+        <h3 style="font-size: 15px; margin-bottom: 10px;">Edit Assigned Value Rates</h3>
+        <div id="rates-list-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;"></div>
+        <div style="display: flex; justify-content: flex-end;">
+            <button class="secondary" onclick="closeModal('rates-modal')">Close</button>
+        </div>
+    </div>
+</div>
         <div style="background: white; padding: 20px; border-radius: 8px; max-width: 340px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
             <h3 style="font-size: 15px; margin-bottom: 8px;">Clone Layout Structure</h3>
             <p style="font-size: 13px; color:#64748b; margin-bottom:10px;">This copies columns and headers to other pages.</p>
@@ -175,17 +185,13 @@
         </div>
     </div>
 
-    <script>
+        <script>
         let appData = {
             currentBookId: "November_2026",
             books: {
                 "November_2026": {
-                    currentPage: 1,
-                    globalTemplates: {},
-                    editLocked: false,
-                    pages: {
-                        1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} }
-                    }
+                    currentPage: 1, globalTemplates: {}, editLocked: false,
+                    pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } }
                 }
             }
         };
@@ -198,21 +204,17 @@
         try {
             if (window.localStorage && localStorage.getItem("ledger_archive_master")) {
                 appData = JSON.parse(localStorage.getItem("ledger_archive_master"));
-                if (!appData.currentBookId) appData.currentBookId = "November_2026";
-                if (!appData.books) appData.books = {};
-                if (!appData.books[appData.currentBookId]) {
-                    appData.books[appData.currentBookId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
-                }
             }
-        } catch(e) { console.error("Storage lookup crashed", e); }
+        } catch (e) { console.error(e); }
 
         function saveState() {
-            try {
-                if (window.localStorage) localStorage.setItem("ledger_archive_master", JSON.stringify(appData));
-            } catch(e) { console.error("Write error", e); }
+            try { if (window.localStorage) localStorage.setItem("ledger_archive_master", JSON.stringify(appData)); } catch (e) {}
         }
 
         function getActiveBook() {
+            if (!appData.books[appData.currentBookId]) {
+                appData.books[appData.currentBookId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
+            }
             return appData.books[appData.currentBookId];
         }
 
@@ -223,30 +225,23 @@
 
         function triggerUndo() {
             let book = getActiveBook();
-            if (book.editLocked) { alert("App is locked. Turn lock off to undo."); return; }
+            if (book.editLocked) { alert("App is locked."); return; }
             if (undoStack.length === 0) { alert("Nothing to undo."); return; }
             appData.books[appData.currentBookId] = JSON.parse(undoStack.pop());
-            saveState();
-            renderPage();
+            saveState(); renderPage();
         }
 
         function toggleEditLock() {
             let book = getActiveBook();
             book.editLocked = !book.editLocked;
-            saveState();
-            updateLockUI();
+            saveState(); updateLockUI();
         }
 
         function updateLockUI() {
             let book = getActiveBook();
             const btn = document.getElementById("lock-btn");
-            if (book.editLocked) {
-                btn.innerText = "🔒 Lock: On";
-                btn.className = "warn active";
-            } else {
-                btn.innerText = "🔓 Lock: Off";
-                btn.className = "warn";
-            }
+            if (book.editLocked) { btn.innerText = "🔒 Lock: On"; btn.className = "warn active"; }
+            else { btn.innerText = "🔓 Lock: Off"; btn.className = "warn"; }
             renderPage();
         }
 
@@ -254,12 +249,10 @@
             const drawer = document.getElementById("left-drawer");
             const backdrop = document.getElementById("left-backdrop");
             if (open) {
-                renderLeftDrawerList();
-                backdrop.style.display = "block";
+                renderLeftDrawerList(); backdrop.style.display = "block";
                 setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
             } else {
-                drawer.classList.remove("open");
-                backdrop.style.opacity = "0";
+                drawer.classList.remove("open"); backdrop.style.opacity = "0";
                 setTimeout(() => { backdrop.style.display = "none"; }, 200);
             }
         }
@@ -268,11 +261,11 @@
             let book = getActiveBook();
             const listContainer = document.getElementById("left-drawer-list");
             listContainer.innerHTML = "";
-            Object.keys(book.pages).sort((a,b) => a-b).forEach(pNum => {
+            Object.keys(book.pages).sort((a, b) => a - b).forEach(pNum => {
                 const div = document.createElement("div");
                 div.className = "drawer-item" + (parseInt(pNum) === book.currentPage ? " active" : "");
                 let heading = book.pages[pNum].topSpace.trim();
-                div.innerText = "Page " + pNum + (heading ? ": " + heading : " (Untitled Page)");
+                div.innerText = "Page " + pNum + (heading ? ": " + heading : " (Untitled)");
                 div.onclick = function() { jumpToPage(parseInt(pNum)); };
                 listContainer.appendChild(div);
             });
@@ -281,22 +274,17 @@
         function jumpToPage(pNum) {
             let book = getActiveBook();
             book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
-            book.currentPage = pNum;
-            saveState();
-            toggleLeftDrawer(false);
-            renderPage();
+            book.currentPage = pNum; saveState(); toggleLeftDrawer(false); renderPage();
         }
 
         function toggleRightDrawer(open) {
             const drawer = document.getElementById("right-drawer");
             const backdrop = document.getElementById("right-backdrop");
             if (open) {
-                renderRightDrawerList();
-                backdrop.style.display = "block";
+                renderRightDrawerList(); backdrop.style.display = "block";
                 setTimeout(() => { backdrop.style.opacity = "1"; drawer.classList.add("open"); }, 10);
             } else {
-                drawer.classList.remove("open");
-                backdrop.style.opacity = "0";
+                drawer.classList.remove("open"); backdrop.style.opacity = "0";
                 setTimeout(() => { backdrop.style.display = "none"; }, 200);
             }
         }
@@ -317,52 +305,40 @@
             const m = document.getElementById("new-book-month").value;
             const y = document.getElementById("new-book-year").value;
             const newId = m + "_" + y;
-            if (appData.books[newId]) { alert("This monthly ledger book profile already exists."); return; }
+            if (appData.books[newId]) { alert("Book already exists."); return; }
             appData.books[newId] = { currentPage: 1, globalTemplates: {}, editLocked: false, pages: { 1: { topSpace: "", headers: ["Column 1", "Column 2"], grid: Array.from({ length: 31 }, () => ["", ""]), overrides: {} } } };
             appData.currentBookId = newId;
-            saveState();
-            renderRightDrawerList();
-            toggleRightDrawer(false);
-            renderPage();
-            updateLockUI();
+            saveState(); toggleRightDrawer(false); renderPage(); updateLockUI();
         }
 
         function switchActiveBook(bId) {
             let currentBook = getActiveBook();
             currentBook.pages[currentBook.currentPage].topSpace = document.getElementById("top-space").value;
             appData.currentBookId = bId;
-            saveState();
-            toggleRightDrawer(false);
-            renderPage();
-            updateLockUI();
+            saveState(); toggleRightDrawer(false); renderPage(); updateLockUI();
         }
 
-    function initApp() {
+        function initApp() {
             let book = getActiveBook();
-            ensurePageExists(book.currentPage);
-            updateLockUI();
-            setupSwipeGestures();
+            ensurePageExists(book.currentPage); updateLockUI(); setupSwipeGestures();
         }
 
         function ensurePageExists(pageNo) {
             let book = getActiveBook();
             if (!book.pages) book.pages = {};
             if (!book.pages[pageNo]) {
-                let defaultColCount = 2;
-                let defaultHeaders = ["Column 1", "Column 2"];
+                let defaultColCount = 2; let defaultHeaders = ["Column 1", "Column 2"];
                 let keys = Object.keys(book.pages);
                 if (keys.length > 0) {
                     let firstPage = book.pages[keys[0]];
-                    defaultColCount = firstPage.headers.length;
-                    defaultHeaders = [...firstPage.headers];
+                    defaultColCount = firstPage.headers.length; defaultHeaders = [...firstPage.headers];
                 }
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
             }
         }
-                                function handleCellKey(e, el) {
-            if (e.key === "Enter" || e.keyCode === 13) {
-                el.blur();
-            }
+
+        function handleCellKey(e, el) {
+            if (e.key === "Enter" || e.keyCode === 13) el.blur();
         }
 
         function renderPage() {
@@ -399,11 +375,9 @@
             calculateTotals();
         }
 
-
         function updateHeader(colIndex, newTitle) {
             pushToUndo(); let book = getActiveBook(); book.pages[book.currentPage].headers[colIndex] = newTitle; saveState();
         }
-
         function handleCellEdit(row, col, value) {
             let book = getActiveBook(); value = value.trim();
             if (!book.pages[book.currentPage].grid[row]) book.pages[book.currentPage].grid[row] = [];
@@ -422,53 +396,32 @@
         }
 
         function showSuggestions(inputEl, row, col) {
-            let book = getActiveBook();
-            const query = inputEl.value.trim().toLowerCase();
-            const box = document.getElementById("global-suggest-box");
-            if (!query) { box.style.display = "none"; return; }
-            
-            const headerName = book.pages[book.currentPage].headers[col];
-            let options = [];
+            let book = getActiveBook(); const query = inputEl.value.trim().toLowerCase();
+            const box = document.getElementById("global-suggest-box"); if (!query) { box.style.display = "none"; return; }
+            const headerName = book.pages[book.currentPage].headers[col]; let options = [];
             if (book.globalTemplates[headerName]) options = Object.keys(book.globalTemplates[headerName]);
             if (book.pages[book.currentPage].overrides[headerName]) {
-                Object.keys(book.pages[book.currentPage].overrides[headerName]).forEach(k => {
-                    if (!options.includes(k)) options.push(k);
-                });
+                Object.keys(book.pages[book.currentPage].overrides[headerName]).forEach(k => { if (!options.includes(k)) options.push(k); });
             }
-            const matches = options.filter(opt => opt.toLowerCase().startsWith(query));
-            if (matches.length === 0) { box.style.display = "none"; return; }
-            
-            const rect = inputEl.getBoundingClientRect();
-            box.innerHTML = "";
-            box.style.top = (window.scrollY + rect.bottom) + "px";
-            box.style.left = (window.scrollX + rect.left) + "px";
-            box.style.width = rect.width + "px";
-            box.style.display = "block";
-            
+            const matches = options.filter(opt => opt.toLowerCase().startsWith(query)); if (matches.length === 0) { box.style.display = "none"; return; }
+            const rect = inputEl.getBoundingClientRect(); box.innerHTML = "";
+            box.style.top = (window.scrollY + rect.bottom) + "px"; box.style.left = (window.scrollX + rect.left) + "px";
+            box.style.width = rect.width + "px"; box.style.display = "block";
             matches.forEach(match => {
-                const item = document.createElement("div");
-                item.className = "suggest-item";
-                item.innerText = match;
-                item.onmousedown = function() {
-                    inputEl.value = match;
-                    box.style.display = "none";
-                    handleCellEdit(row, col, match);
-                    renderPage();
-                };
+                const item = document.createElement("div"); item.className = "suggest-item"; item.innerText = match;
+                item.onmousedown = function() { inputEl.value = match; box.style.display = "none"; handleCellEdit(row, col, match); renderPage(); };
                 box.appendChild(item);
             });
         }
 
-        function hideSuggestionsLater() {
-            setTimeout(() => { document.getElementById("global-suggest-box").style.display = "none"; }, 200);
-        }
+        function hideSuggestionsLater() { setTimeout(() => { document.getElementById("global-suggest-box").style.display = "none"; }, 200); }
+
         function openValueModal(headerName, word, row, col) {
             activePromptContext = { headerName, word, row, col };
             document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
-            document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency mapping rate:';
+            document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency rate:';
             document.getElementById("modal-value-input").value = "";
-            
-            closeModal('clone-modal');
+            closeModal('clone-modal'); closeModal('rates-modal');
             document.getElementById("value-modal").style.display = "flex";
             document.getElementById("modal-value-input").focus();
         }
@@ -478,16 +431,8 @@
 
         function savePromptedValue(isLocalOnly) {
             const numericValue = parseFloat(document.getElementById("modal-value-input").value);
-            if (isNaN(numericValue)) {
-                alert("Please enter a valid numeric number.");
-                return;
-            }
-
-            const headerName = activePromptContext.headerName;
-            const word = activePromptContext.word;
-            let book = getActiveBook();
-
-            pushToUndo();
+            if (isNaN(numericValue)) { alert("Please enter a valid number."); return; }
+            const headerName = activePromptContext.headerName; const word = activePromptContext.word; let book = getActiveBook(); pushToUndo();
             if (isLocalOnly) {
                 if (!book.pages[book.currentPage].overrides[headerName]) book.pages[book.currentPage].overrides[headerName] = {};
                 book.pages[book.currentPage].overrides[headerName][word] = numericValue;
@@ -495,35 +440,77 @@
                 if (!book.globalTemplates[headerName]) book.globalTemplates[headerName] = {};
                 book.globalTemplates[headerName][word] = numericValue;
             }
-
-            closeModal("value-modal");
-            saveState();
-            calculateTotals();
+            closeModal("value-modal"); saveState(); calculateTotals();
         }
 
-        function closeModal(id) { document.getElementById(id).style.display = "none"; }
-
-        function calculateTotals() {
+        function openRatesEditor() {
             let book = getActiveBook();
             const pageData = book.pages[book.currentPage];
-            let counts = {}; 
-            let grandTotal = 0;
+            const container = document.getElementById("rates-list-container");
+            container.innerHTML = "";
+            let foundAny = false;
 
+            Object.keys(book.globalTemplates).forEach(col => {
+                Object.keys(book.globalTemplates[col]).forEach(word => {
+                    foundAny = true;
+                    container.appendChild(createRateRow(col, word, book.globalTemplates[col][word], false));
+                });
+            });
+
+            Object.keys(pageData.overrides).forEach(col => {
+                Object.keys(pageData.overrides[col]).forEach(word => {
+                    foundAny = true;
+                    container.appendChild(createRateRow(col, word, pageData.overrides[col][word], true));
+                });
+            });
+
+            if (!foundAny) {
+                container.innerHTML = '<p style="font-size:13px; color:#64748b;">No assigned rates yet. Type an entry into a cell first.</p>';
+            }
+            document.getElementById("rates-modal").style.display = "flex";
+        }
+
+        function createRateRow(col, word, currentVal, isLocal) {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px; background:#f1f5f9; border-radius:6px; font-size:12px;";
+            const label = document.createElement("span");
+            label.innerHTML = "<strong>" + word + "</strong> (" + col + (isLocal ? " - Page" : " - Global") + ")";
+            const input = document.createElement("input");
+            input.type = "number";
+            input.value = currentVal;
+            input.style.cssText = "width:75px; padding:4px; border:1px solid #cbd5e1; border-radius:4px;";
+            input.onchange = function() {
+                const newVal = parseFloat(this.value);
+                if (isNaN(newVal)) return;
+                let book = getActiveBook();
+                pushToUndo();
+                if (isLocal) book.pages[book.currentPage].overrides[col][word] = newVal;
+                else book.globalTemplates[col][word] = newVal;
+                saveState();
+                calculateTotals();
+            };
+            row.appendChild(label);
+            row.appendChild(input);
+            return row;
+        }
+
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = "none";
+        }
+
+        function calculateTotals() {
+            let book = getActiveBook(); const pageData = book.pages[book.currentPage]; let counts = {}; let grandTotal = 0;
             pageData.headers.forEach((headerName, colIdx) => {
                 for (let rowIdx = 0; rowIdx < 31; rowIdx++) {
                     const word = pageData.grid[rowIdx]?.[colIdx];
                     if (word && word.trim() !== "") {
                         let unitValue = pageData.overrides[headerName]?.[word];
                         if (unitValue === undefined) unitValue = book.globalTemplates[headerName]?.[word];
-                        
                         if (unitValue !== undefined) {
                             const trackingKey = headerName + "_" + word;
-                            if (!counts[trackingKey]) {
-                                counts[trackingKey] = { count: 0, val: unitValue, rawWord: word, header: headerName };
-                            }
+                            if (!counts[trackingKey]) counts[trackingKey] = { count: 0, val: unitValue, rawWord: word, header: headerName };
                             counts[trackingKey].count++;
-                        } else if (!isNaN(word)) {
-                            grandTotal += parseFloat(word);
                         }
                     }
                 }
@@ -531,21 +518,13 @@
 
             const breakdownOutput = document.getElementById("breakdown-output");
             if (breakdownOutput) {
-                breakdownOutput.innerHTML = "";
-                const keys = Object.keys(counts);
-                if (keys.length === 0 && grandTotal === 0) {
-                    breakdownOutput.innerText = "No entries yet.";
-                    document.getElementById("grand-total-output").innerText = "GRAND TOTAL: ₹0";
-                    return;
+                breakdownOutput.innerHTML = ""; const keys = Object.keys(counts);
+                if (keys.length === 0) {
+                    breakdownOutput.innerText = "No entries yet."; document.getElementById("grand-total-output").innerText = "GRAND TOTAL: ₹0"; return;
                 }
-
                 keys.forEach(key => {
-                    const item = counts[key];
-                    const subTotal = item.count * item.val;
-                    grandTotal += subTotal;
-
-                    const div = document.createElement("div");
-                    div.style.marginBottom = "4px";
+                    const item = counts[key]; const subTotal = item.count * item.val; grandTotal += subTotal;
+                    const div = document.createElement("div"); div.style.marginBottom = "4px";
                     div.innerHTML = "• <strong>" + item.rawWord + "</strong> (<em>" + item.header + "</em>) x " + item.count + " &rarr; ₹<strong>" + subTotal + "</strong>";
                     breakdownOutput.appendChild(div);
                 });
@@ -554,118 +533,69 @@
         }
 
         function addColumn() {
-            let book = getActiveBook();
-            if (book.editLocked) { alert("App is locked."); return; }
-            pushToUndo();
-            const pageData = book.pages[book.currentPage];
-            const nextIdx = pageData.headers.length + 1;
-            pageData.headers.push("Column " + nextIdx);
-            for (let r = 0; r < 31; r++) {
-                if (!pageData.grid[r]) pageData.grid[r] = [];
-                pageData.grid[r].push("");
-            }
-            saveState();
-            renderPage();
+            let book = getActiveBook(); if (book.editLocked) return; pushToUndo();
+            const pageData = book.pages[book.currentPage]; const nextIdx = pageData.headers.length + 1; pageData.headers.push("Column " + nextIdx);
+            for (let r = 0; r < 31; r++) { if (!pageData.grid[r]) pageData.grid[r] = []; pageData.grid[r].push(""); }
+            saveState(); renderPage();
         }
 
         function deleteLastColumn() {
-            let book = getActiveBook();
-            if (book.editLocked) { alert("App is locked."); return; }
-            const pageData = book.pages[book.currentPage];
-            if (pageData.headers.length <= 1) return;
-            if (confirm("Delete the last column data stream entirely?")) {
-                pushToUndo();
-                pageData.headers.pop();
-                for (let r = 0; r < 31; r++) {
-                    if (pageData.grid[r]) pageData.grid[r].pop();
-                }
-                saveState();
-                renderPage();
+            let book = getActiveBook(); if (book.editLocked) return; const pageData = book.pages[book.currentPage]; if (pageData.headers.length <= 1) return;
+            if (confirm("Delete last column?")) {
+                pushToUndo(); pageData.headers.pop(); for (let r = 0; r < 31; r++) { if (pageData.grid[r]) pageData.grid[r].pop(); }
+                saveState(); renderPage();
             }
         }
 
-        function openCloneModal() { 
-            closeModal('value-modal');
-            document.getElementById("clone-modal").style.display = "flex"; 
-        }
+        function openCloneModal() { closeModal('value-modal'); closeModal('rates-modal'); document.getElementById("clone-modal").style.display = "flex"; }
 
         function executeLayoutClone() {
-            let book = getActiveBook();
-            const limit = parseInt(document.getElementById("clone-target-page").value);
-            if (isNaN(limit) || limit < 1) return;
-
-            const sourceHeaders = [...book.pages[book.currentPage].headers];
-            const colCount = sourceHeaders.length;
-
+            let book = getActiveBook(); const limit = parseInt(document.getElementById("clone-target-page").value); if (isNaN(limit) || limit < 1) return;
+            const sourceHeaders = [...book.pages[book.currentPage].headers]; const colCount = sourceHeaders.length;
             for (let p = 1; p <= limit; p++) {
                 ensurePageExists(p);
                 if (p !== book.currentPage) {
                     book.pages[p].headers = [...sourceHeaders];
                     for (let r = 0; r < 31; r++) {
                         let rowArr = book.pages[p].grid[r] || [];
-                        while(rowArr.length < colCount) rowArr.push("");
+                        while (rowArr.length < colCount) rowArr.push("");
                         if (rowArr.length > colCount) rowArr = rowArr.slice(0, colCount);
                         book.pages[p].grid[r] = rowArr;
                     }
                 }
             }
-            closeModal("clone-modal");
-            saveState();
-            alert("Layout cloned!");
+            closeModal("clone-modal"); saveState(); alert("Layout cloned!");
         }
+
         function changePage(direction) {
-            let book = getActiveBook();
-            book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
-            saveState();
-            let target = book.currentPage + direction;
-            if (target < 1) target = 1;
-            ensurePageExists(target);
-            book.currentPage = target;
-            saveState();
-            renderPage();
+            let book = getActiveBook(); book.pages[book.currentPage].topSpace = document.getElementById("top-space").value; saveState();
+            let target = book.currentPage + direction; if (target < 1) target = 1;
+            ensurePageExists(target); book.currentPage = target; saveState(); renderPage();
         }
 
         function addNewPage() {
-            let book = getActiveBook();
-            book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
-            const absoluteTotalPages = Object.keys(book.pages).length;
-            const newIndexIdx = absoluteTotalPages + 1;
-            ensurePageExists(newIndexIdx);
-            book.currentPage = newIndexIdx;
-            saveState();
-            toggleLeftDrawer(false);
-            renderPage();
+            let book = getActiveBook(); book.pages[book.currentPage].topSpace = document.getElementById("top-space").value;
+            const absoluteTotalPages = Object.keys(book.pages).length; const newIndexIdx = absoluteTotalPages + 1;
+            ensurePageExists(newIndexIdx); book.currentPage = newIndexIdx; saveState(); toggleLeftDrawer(false); renderPage();
         }
 
         document.getElementById("top-space").onchange = function() {
-            pushToUndo();
-            let book = getActiveBook();
-            book.pages[book.currentPage].topSpace = this.value;
-            saveState();
+            pushToUndo(); let book = getActiveBook(); book.pages[book.currentPage].topSpace = this.value; saveState();
         };
 
         function setupSwipeGestures() {
-            document.addEventListener('touchstart', e => { touchStartX = e.changedTouches.screenX; }, {passive: true});
-            document.addEventListener('touchend', e => {
-                touchEndX = e.changedTouches.screenX;
-                handleSwipeMove();
-            }, {passive: true});
+            document.addEventListener('touchstart', e => { touchStartX = e.changedTouches.screenX; }, { passive: true });
+            document.addEventListener('touchend', e => { touchEndX = e.changedTouches.screenX; handleSwipeMove(); }, { passive: true });
         }
 
         function handleSwipeMove() {
             const dragDistance = touchEndX - touchStartX;
-            if (dragDistance > 140) {
-                toggleLeftDrawer(true);
-                toggleRightDrawer(false);
-            }
-            if (dragDistance < -140) {
-                toggleRightDrawer(true);
-                toggleLeftDrawer(false);
-            }
+            if (dragDistance > 140) { toggleLeftDrawer(true); toggleRightDrawer(false); }
+            if (dragDistance < -140) { toggleRightDrawer(true); toggleLeftDrawer(false); }
             touchStartX = 0; touchEndX = 0;
         }
 
-                        async function openPrintPreview() {
+        async function openPrintPreview() {
             let book = getActiveBook();
             const pageData = book.pages[book.currentPage];
             let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
@@ -704,20 +634,12 @@
                         data: pdfBase64,
                         directory: "DOCUMENTS"
                     });
-                    alert("✅ PDF Saved Successfully!\n\nOpen your phone's File Manager -> Documents folder to view or share:\n" + fileName);
+                    alert("✅ PDF Saved Successfully!\n\nOpen File Manager -> Documents folder:\n" + fileName);
                     return;
                 }
             } catch (err) {
                 alert("PDF Save Error: " + err.message);
             }
-        }
-
-            const link = document.createElement("a");
-            link.href = "data:application/pdf;base64," + pdfBase64;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         }
 
         function buildSimplePdfBase64(lines) {
@@ -738,10 +660,7 @@
 
             let pdf = "%PDF-1.4\n";
             let offsets = new Array(1).fill(0);
-            objects.forEach(obj => {
-                offsets.push(pdf.length);
-                pdf += obj;
-            });
+            objects.forEach(obj => { offsets.push(pdf.length); pdf += obj; });
 
             let xrefPos = pdf.length;
             pdf += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
@@ -757,21 +676,8 @@
             document.getElementById("main-app-content").style.display = "block";
         }
 
-        function openGlobalValuesView() {
-            let msg = "Registered Dictionary Mappings:\n\n";
-            let book = getActiveBook();
-            Object.keys(book.globalTemplates).forEach(col => {
-                msg += "[Column: " + col + "]\n";
-                Object.keys(book.globalTemplates[col]).forEach(w => {
-                    msg += '  "' + w + '" = ₹' + book.globalTemplates[col][w] + '\n';
-                });
-            });
-            alert(msg);
-        }
-
-        window.onload = function() {
-            initApp();
-        };
+        window.onload = function() { initApp(); };
     </script>
 </body>
 </html>
+
