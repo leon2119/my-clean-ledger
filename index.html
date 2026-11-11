@@ -425,14 +425,15 @@
 
         function hideSuggestionsLater() { setTimeout(() => { document.getElementById("global-suggest-box").style.display = "none"; }, 200); }
 
-        function openValueModal(headerName, word, row, col) {
+           function openValueModal(headerName, word, row, col) {
+            if (document.getElementById("rates-modal").style.display === "flex") return;
             activePromptContext = { headerName, word, row, col };
             document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
             document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency rate:';
             document.getElementById("modal-value-input").value = "";
-            closeModal('clone-modal'); closeModal('rates-modal');
+            closeModal('clone-modal');
             document.getElementById("value-modal").style.display = "flex";
-            document.getElementById("modal-value-input").focus();
+            setTimeout(() => document.getElementById("modal-value-input").focus(), 100);
         }
 
         function savePromptedValue(isLocalOnly) {
@@ -450,31 +451,35 @@
         }
 
         function openRatesEditor() {
-            let book = getActiveBook();
-            const pageData = book.pages[book.currentPage];
-            const container = document.getElementById("rates-list-container");
-            container.innerHTML = "";
-            let foundAny = false;
+            if (document.activeElement) document.activeElement.blur();
+            setTimeout(() => {
+                closeModal('value-modal');
+                closeModal('clone-modal');
+                let book = getActiveBook();
+                const pageData = book.pages[book.currentPage];
+                const container = document.getElementById("rates-list-container");
+                container.innerHTML = "";
+                let foundAny = false;
 
-            Object.keys(book.globalTemplates).forEach(col => {
-                Object.keys(book.globalTemplates[col]).forEach(word => {
-                    foundAny = true;
-                    container.appendChild(createRateRow(col, word, book.globalTemplates[col][word], false));
+                Object.keys(book.globalTemplates || {}).forEach(col => {
+                    Object.keys(book.globalTemplates[col]).forEach(word => {
+                        foundAny = true;
+                        container.appendChild(createRateRow(col, word, book.globalTemplates[col][word], false));
+                    });
                 });
-            });
 
-            Object.keys(pageData.overrides).forEach(col => {
-                Object.keys(pageData.overrides[col]).forEach(word => {
-                    foundAny = true;
-                    container.appendChild(createRateRow(col, word, pageData.overrides[col][word], true));
+                Object.keys(pageData.overrides || {}).forEach(col => {
+                    Object.keys(pageData.overrides[col]).forEach(word => {
+                        foundAny = true;
+                        container.appendChild(createRateRow(col, word, pageData.overrides[col][word], true));
+                    });
                 });
-            });
 
-            if (!foundAny) {
-                container.innerHTML = '<p style="font-size:13px; color:#64748b;">No assigned rates yet. Type an entry into a cell first.</p>';
-            }
-            closeModal('value-modal'); closeModal('clone-modal');
-            document.getElementById("rates-modal").style.display = "flex";
+                if (!foundAny) {
+                    container.innerHTML = '<p style="font-size:13px; color:#64748b;">No assigned rates yet. Type an entry into a cell and tap another cell first.</p>';
+                }
+                document.getElementById("rates-modal").style.display = "flex";
+            }, 150);
         }
 
         function createRateRow(col, word, currentVal, isLocal) {
@@ -505,6 +510,7 @@
             const el = document.getElementById(id);
             if (el) el.style.display = "none";
         }
+
         function calculateTotals() {
             let book = getActiveBook(); const pageData = book.pages[book.currentPage]; let counts = {}; let grandTotal = 0;
             pageData.headers.forEach((headerName, colIdx) => {
@@ -601,7 +607,7 @@
             touchStartX = 0; touchEndX = 0;
         }
 
-        function openPrintPreview() {
+                async function openPrintPreview() {
             try {
                 let book = getActiveBook();
                 const pageData = book.pages[book.currentPage];
@@ -631,22 +637,29 @@
                 lines.push(totalText);
 
                 let pdfString = buildSimplePdfString(lines);
+                let pdfBase64 = btoa(pdfString);
                 let fileName = "Ledger_" + appData.currentBookId + "_P" + book.currentPage + ".pdf";
 
-                let blob = new Blob([pdfString], { type: "application/pdf" });
-                let url = URL.createObjectURL(blob);
-                let link = document.createElement("a");
-                link.href = url;
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 5000);
-                alert("✅ PDF File Downloaded: " + fileName);
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share) {
+                    const { Filesystem, Share } = window.Capacitor.Plugins;
+                    const saved = await Filesystem.writeFile({
+                        path: fileName,
+                        data: pdfBase64,
+                        directory: "CACHE"
+                    });
+                    await Share.share({
+                        title: fileName,
+                        url: saved.uri,
+                        dialogTitle: "Save or Share Ledger PDF"
+                    });
+                    return;
+                }
+                alert("PDF plugin not ready.");
             } catch (err) {
                 alert("PDF Error: " + err.message);
             }
         }
+
 
         function buildSimplePdfString(lines) {
             let content = "BT /F1 11 Tf 40 780 Td 16 TL ";
