@@ -732,7 +732,7 @@
             ];
 
             let pdf = "%PDF-1.4\n";
-            let offsets =;
+            let offsets = new Array(1).fill(0);
             objects.forEach(obj => {
                 offsets.push(pdf.length);
                 pdf += obj;
