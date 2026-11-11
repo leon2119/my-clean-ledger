@@ -188,6 +188,15 @@
 
 
                <script>
+                           window.onerror = function(msg, url, line, col, err) {
+            alert("🚨 JS ERROR FOUND:\n" + msg + "\nLine: " + line + "\nCol: " + col);
+            return false;
+        };
+
+        window.addEventListener("unhandledrejection", function(e) {
+            alert("🚨 ASYNC ERROR:\n" + (e.reason ? e.reason.message || e.reason : e));
+        });
+
         let appData = {
             currentBookId: "November_2026",
             books: {
@@ -425,15 +434,20 @@
 
         function hideSuggestionsLater() { setTimeout(() => { document.getElementById("global-suggest-box").style.display = "none"; }, 200); }
 
-           function openValueModal(headerName, word, row, col) {
-            if (document.getElementById("rates-modal").style.display === "flex") return;
-            activePromptContext = { headerName, word, row, col };
-            document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
-            document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency rate:';
-            document.getElementById("modal-value-input").value = "";
-            closeModal('clone-modal');
-            document.getElementById("value-modal").style.display = "flex";
-            setTimeout(() => document.getElementById("modal-value-input").focus(), 100);
+             function openValueModal(headerName, word, row, col) {
+            try {
+                const vm = document.getElementById("value-modal");
+                if (!vm) { alert("❌ ERROR: value-modal HTML missing!"); return; }
+                activePromptContext = { headerName, word, row, col };
+                document.getElementById("modal-title").innerText = 'Assign Value for "' + word + '"';
+                document.getElementById("modal-description").innerText = 'Column "' + headerName + '". Setup currency rate:';
+                document.getElementById("modal-value-input").value = "";
+                closeModal('clone-modal');
+                closeModal('rates-modal');
+                vm.style.display = "flex";
+            } catch (e) {
+                alert("❌ openValueModal Crash: " + e.message);
+            }
         }
 
         function savePromptedValue(isLocalOnly) {
@@ -450,11 +464,10 @@
             closeModal("value-modal"); saveState(); calculateTotals();
         }
 
-        function openRatesEditor() {
-            if (document.activeElement) document.activeElement.blur();
-            setTimeout(() => {
-                closeModal('value-modal');
-                closeModal('clone-modal');
+function openRatesEditor() {
+            try {
+                const rm = document.getElementById("rates-modal");
+                if (!rm) { alert("❌ ERROR: rates-modal HTML missing!"); return; }
                 let book = getActiveBook();
                 const pageData = book.pages[book.currentPage];
                 const container = document.getElementById("rates-list-container");
@@ -476,10 +489,14 @@
                 });
 
                 if (!foundAny) {
-                    container.innerHTML = '<p style="font-size:13px; color:#64748b;">No assigned rates yet. Type an entry into a cell and tap another cell first.</p>';
+                    container.innerHTML = '<p style="font-size:13px; color:#64748b;">No assigned rates yet. Type a value in a cell and tap another cell first.</p>';
                 }
-                document.getElementById("rates-modal").style.display = "flex";
-            }, 150);
+                closeModal('value-modal');
+                closeModal('clone-modal');
+                rm.style.display = "flex";
+            } catch (e) {
+                alert("❌ openRatesEditor Crash: " + e.message);
+            }
         }
 
         function createRateRow(col, word, currentVal, isLocal) {
@@ -607,56 +624,35 @@
             touchStartX = 0; touchEndX = 0;
         }
 
-                async function openPrintPreview() {
+                       async function openPrintPreview() {
             try {
+                let hasCap = !!window.Capacitor;
+                let plugins = window.Capacitor && window.Capacitor.Plugins ? Object.keys(window.Capacitor.Plugins).join(", ") : "NONE";
+                alert("🔍 PDF DIAGNOSTIC:\nCapacitor loaded: " + hasCap + "\nAvailable Plugins: " + plugins);
+
                 let book = getActiveBook();
                 const pageData = book.pages[book.currentPage];
-                let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
-                let bookTitle = appData.currentBookId.replace("_", " ");
-
-                let lines = [
-                    "LEDGER REPORT: " + bookTitle,
-                    "Page No: " + book.currentPage + " | Notes: " + title,
-                    "------------------------------------------------------------",
-                    "Day | " + pageData.headers.join(" | "),
-                    "------------------------------------------------------------"
-                ];
-
-                for (let r = 0; r < 31; r++) {
-                    let rowVals = []; let hasData = false;
-                    for (let c = 0; c < pageData.headers.length; c++) {
-                        let v = (pageData.grid[r]?.[c] || "").replace(/[^\x20-\x7E]/g, "");
-                        if (v !== "") hasData = true;
-                        rowVals.push(v || "-");
-                    }
-                    if (hasData) lines.push("Day " + (r + 1) + " | " + rowVals.join(" | "));
-                }
-
-                lines.push("------------------------------------------------------------");
-                let totalText = document.getElementById("grand-total-output").innerText.replace("₹", "Rs. ");
-                lines.push(totalText);
-
+                let lines = ["LEDGER REPORT: " + appData.currentBookId, "Page: " + book.currentPage];
                 let pdfString = buildSimplePdfString(lines);
                 let pdfBase64 = btoa(pdfString);
-                let fileName = "Ledger_" + appData.currentBookId + "_P" + book.currentPage + ".pdf";
+                let fileName = "Ledger_Test.pdf";
 
-                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share) {
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
                     const { Filesystem, Share } = window.Capacitor.Plugins;
                     const saved = await Filesystem.writeFile({
                         path: fileName,
                         data: pdfBase64,
                         directory: "CACHE"
                     });
-                    await Share.share({
-                        title: fileName,
-                        url: saved.uri,
-                        dialogTitle: "Save or Share Ledger PDF"
-                    });
-                    return;
+                    alert("✅ File written to: " + saved.uri);
+                    if (Share) {
+                        await Share.share({ title: fileName, url: saved.uri });
+                    }
+                } else {
+                    alert("❌ Filesystem plugin NOT found in Capacitor!");
                 }
-                alert("PDF plugin not ready.");
             } catch (err) {
-                alert("PDF Error: " + err.message);
+                alert("❌ PDF Exact Error: " + (err.message || JSON.stringify(err)));
             }
         }
 
