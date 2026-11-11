@@ -348,7 +348,7 @@
                 let defaultColCount = 2; let defaultHeaders = ["Column 1", "Column 2"];
                 let keys = Object.keys(book.pages);
                 if (keys.length > 0) {
-                    let firstPage = book.pages[keys];
+                    let firstPage = book.pages[keys[0]];
                     defaultColCount = firstPage.headers.length; defaultHeaders = [...firstPage.headers];
                 }
                 book.pages[pageNo] = { topSpace: "", headers: defaultHeaders, grid: Array.from({ length: 31 }, () => Array(defaultColCount).fill("")), overrides: {} };
