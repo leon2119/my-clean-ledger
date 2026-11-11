@@ -115,7 +115,7 @@
     <!-- Isolated Print Screen Component -->
     <div id="print-view-overlay">
         <div class="print-btn-bar">
-            <button style="background-color: #10b981;" onclick="window.print()">🖨️ Open Android Printer</button>
+            <button style="background-color: #10b981;" onclick="if(window.AndroidPrinter){window.AndroidPrinter.printPage('Ledger_Report');}">🖨️ Save as PDF / Print</button>
             <button class="secondary" onclick="closePrintPreview()">✕ Close Preview</button>
         </div>
         <div id="print-document-target"></div>
@@ -624,94 +624,78 @@ function openRatesEditor() {
             touchStartX = 0; touchEndX = 0;
         }
 
-                                     async function openPrintPreview() {
-            try {
-                let book = getActiveBook();
-                const pageData = book.pages[book.currentPage];
-                let title = (pageData.topSpace.trim() || "Untitled Page").replace(/[^\x20-\x7E]/g, "");
-                let bookTitle = appData.currentBookId.replace("_", " ");
+                                            function openPrintPreview() {
+            let book = getActiveBook();
+            let printAll = confirm("Tap OK to export the ENTIRE BOOK (" + Object.keys(book.pages).length + " pages) as PDF.\n\nTap Cancel to export ONLY Page " + book.currentPage + ".");
+            let pageNums = printAll ? Object.keys(book.pages).sort((a, b) => a - b).map(Number) : [book.currentPage];
 
-                let lines = [
-                    "LEDGER REPORT: " + bookTitle,
-                    "Page No: " + book.currentPage + " | Notes: " + title,
-                    "------------------------------------------------------------",
-                    "Day | " + pageData.headers.join(" | "),
-                    "------------------------------------------------------------"
-                ];
+            let html = "";
+            pageNums.forEach((pNum, idx) => {
+                const pageData = book.pages[pNum];
+                let title = pageData.topSpace.trim() || "Untitled Page";
+                let pageBreak = idx > 0 ? 'style="page-break-before: always;"' : '';
+
+                html += '<div ' + pageBreak + '>';
+                html += '<h2 style="color:#1e3a8a; margin-bottom:4px;">LEDGER REPORT: ' + appData.currentBookId.replace("_", " ") + '</h2>';
+                html += '<p style="margin-bottom:10px; font-size:13px;"><strong>Page ' + pNum + '</strong> | ' + title + '</p>';
+                html += '<table class="print-table"><thead><tr><th>Day</th>';
+                pageData.headers.forEach(h => { html += '<th>' + h + '</th>'; });
+                html += '</tr></thead><tbody>';
+
+                let counts = {};
+                let grandTotal = 0;
 
                 for (let r = 0; r < 31; r++) {
-                    let rowVals = []; let hasData = false;
+                    let rowHTML = '<tr><td>' + (r + 1) + '</td>';
+                    let hasData = false;
                     for (let c = 0; c < pageData.headers.length; c++) {
-                        let v = (pageData.grid[r]?.[c] || "").replace(/[^\x20-\x7E]/g, "");
-                        if (v !== "") hasData = true;
-                        rowVals.push(v || "-");
+                        let cellVal = pageData.grid[r]?.[c] || "";
+                        if (cellVal !== "") {
+                            hasData = true;
+                            let hName = pageData.headers[c];
+                            let unitVal = pageData.overrides[hName]?.[cellVal];
+                            if (unitVal === undefined) unitVal = book.globalTemplates[hName]?.[cellVal];
+                            if (unitVal !== undefined) {
+                                let k = hName + "_" + cellVal;
+                                if (!counts[k]) counts[k] = { count: 0, val: unitVal, word: cellVal, header: hName };
+                                counts[k].count++;
+                            }
+                        }
+                        rowHTML += '<td>' + cellVal + '</td>';
                     }
-                    if (hasData) lines.push("Day " + (r + 1) + " | " + rowVals.join(" | "));
+                    rowHTML += '</tr>';
+                    if (hasData) html += rowHTML;
                 }
 
-                lines.push("------------------------------------------------------------");
-                lines.push("SUMMARY BREAKDOWN:");
-                let breakdownLines = document.getElementById("breakdown-output").innerText.split("\n");
-                breakdownLines.forEach(b => {
-                    let cleanB = b.replace(/[^\x20-\x7E]/g, "Rs. ").trim();
-                    if (cleanB) lines.push(cleanB);
-                });
-
-                lines.push("------------------------------------------------------------");
-                let totalText = document.getElementById("grand-total-output").innerText.replace("₹", "Rs. ");
-                lines.push(totalText);
-
-                let pdfString = buildSimplePdfString(lines);
-                let pdfBase64 = btoa(pdfString);
-                let fileName = "Ledger_" + appData.currentBookId + "_P" + book.currentPage + ".pdf";
-
-                const { Filesystem, Share } = window.Capacitor.Plugins;
-                const saved = await Filesystem.writeFile({
-                    path: fileName,
-                    data: pdfBase64,
-                    directory: "CACHE"
-                });
-
-                await Share.share({
-                    title: fileName,
-                    files: [saved.uri],
-                    dialogTitle: "Save or Share Ledger PDF"
-                });
-            } catch (err) {
-                alert("❌ PDF Error: " + (err.message || JSON.stringify(err)));
-            }
-        }
-
-
-
-        function buildSimplePdfString(lines) {
-            let content = "BT /F1 11 Tf 40 780 Td 16 TL ";
-            lines.forEach(line => {
-                let safe = line.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-                content += "(" + safe + ") Tj T* ";
+                html += '</tbody></table>';
+                html += '<div style="margin-top:10px; padding:10px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">';
+                html += '<strong>Summary Breakdown:</strong><br>';
+                let keys = Object.keys(counts);
+                if (keys.length === 0) {
+                    html += 'No valued entries.<br>';
+                } else {
+                    keys.forEach(k => {
+                        let it = counts[k];
+                        let sub = it.count * it.val;
+                        grandTotal += sub;
+                        html += '• <strong>' + it.word + '</strong> (<em>' + it.header + '</em>) x ' + it.count + ' = <strong>₹' + sub + '</strong><br>';
+                    });
+                }
+                html += '<div style="margin-top:6px; font-size:15px; font-weight:bold; color:#1e3a8a;">GRAND TOTAL: ₹' + grandTotal + '</div>';
+                html += '</div></div>';
             });
-            content += "ET";
 
-            let objects = [
-                "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
-                "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
-                "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n",
-                "4 0 obj << /Length " + content.length + " >> stream\n" + content + "\nendstream endobj\n",
-                "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Courier >> endobj\n"
-            ];
+            document.getElementById("print-document-target").innerHTML = html;
+            document.getElementById("main-app-content").style.display = "none";
+            document.getElementById("print-view-overlay").style.display = "flex";
 
-            let pdf = "%PDF-1.4\n";
-            let offsets = new Array(1).fill(0);
-            objects.forEach(obj => { offsets.push(pdf.length); pdf += obj; });
-
-            let xrefPos = pdf.length;
-            pdf += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
-            for (let i = 1; i < offsets.length; i++) {
-                pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+            if (window.AndroidPrinter && window.AndroidPrinter.printPage) {
+                setTimeout(() => {
+                    window.AndroidPrinter.printPage("Ledger_" + appData.currentBookId);
+                }, 300);
             }
-            pdf += "trailer << /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefPos + "\n%%EOF";
-            return pdf;
         }
+
 
         function closePrintPreview() {
             document.getElementById("print-view-overlay").style.display = "none";
