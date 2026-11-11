@@ -28,11 +28,10 @@ jobs:
         npm install @capacitor/core @capacitor/cli
         npx cap init LedgerBook com.leon2119.cleanledger --web-dir=www
 
-        - name: Install Android Platform Extensions
+    - name: Install Android Platform Extensions
       run: |
         npm install @capacitor/android @capacitor/filesystem @capacitor/share
         npx cap add android
-
 
     - name: Sync App Interface into Android Wrapper
       run: npx cap sync android
@@ -57,7 +56,6 @@ jobs:
     - name: Compile Automated Signed Debug APK Package
       run: |
         cd android
-        # Switching to assembleDebug automatically injects a valid installation signature key
         ./gradlew assembleDebug --no-daemon -Dorg.gradle.dependency.verification=off
 
     - name: Upload APK Artifact
