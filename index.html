@@ -724,7 +724,7 @@ function openRatesEditor() {
             document.getElementById("print-view-overlay").style.display = "none";
             document.getElementById("main-app-content").style.display = "block";
         }
-               const CLOUD_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzO30L71-xiN8dMKNvt_EhV0Y6_hHlHbhJSD4AffYaSE1J7yFyRv630G8e61aSZnjw/exec";
+               const CLOUD_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyLV9D-BnYdvabRTsVp0shQgAltC2tSkwFHAEaa3sTjrus8q-9vaFUHtNwzyinGOyja/exec";
 
         function openCloudModal() {
             closeModal('value-modal');
@@ -737,7 +737,22 @@ function openRatesEditor() {
             document.getElementById("cloud-modal").style.display = "flex";
         }
 
-                async function runCloudAction(actionType) {
+                        async function callCloudGet(paramsObj) {
+            const query = Object.keys(paramsObj)
+                .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(paramsObj[k]))
+                .join("&");
+            const fullUrl = CLOUD_SCRIPT_URL + "?" + query;
+            let raw = "";
+            if (window.AndroidPrinter && window.AndroidPrinter.postCloud) {
+                raw = window.AndroidPrinter.postCloud(fullUrl, "");
+            } else {
+                const res = await fetch(fullUrl);
+                raw = await res.text();
+            }
+            return JSON.parse(raw);
+        }
+
+        async function runCloudAction(actionType) {
             const email = document.getElementById("cloud-email-input").value.trim().toLowerCase();
             const pin = document.getElementById("cloud-pin-input").value.trim();
             const statusBox = document.getElementById("cloud-status-msg");
@@ -752,11 +767,6 @@ function openRatesEditor() {
                 statusBox.innerText = "Please enter a Secret PIN (at least 4 digits).";
                 return;
             }
-            if (CLOUD_SCRIPT_URL.includes("PASTE_YOUR")) {
-                statusBox.style.color = "#ef4444";
-                statusBox.innerText = "Google Script URL is not configured yet.";
-                return;
-            }
 
             if (actionType === "restore") {
                 if (!confirm("Replace current phone data with cloud backup for " + email + "?")) return;
@@ -768,41 +778,33 @@ function openRatesEditor() {
 
             setTimeout(async () => {
                 try {
-                    const payloadStr = JSON.stringify({
-                        action: actionType,
-                        email: email,
-                        pin: pin,
-                        data: actionType === "backup" ? appData : null
-                    });
+                    if (actionType === "backup") {
+                        const initRes = await callCloudGet({ action: "backup_init", email: email, pin: pin });
+                        if (initRes.status !== "ok") throw new Error(initRes.message || "Init failed");
 
-                    let rawResponse = "";
-                    if (window.AndroidPrinter && window.AndroidPrinter.postCloud) {
-                        rawResponse = window.AndroidPrinter.postCloud(CLOUD_SCRIPT_URL, payloadStr);
+                        const jsonStr = JSON.stringify(appData);
+                        const chunkSize = 1500;
+                        let lastRes = initRes;
+                        for (let i = 0; i < jsonStr.length; i += chunkSize) {
+                            const chunk = jsonStr.slice(i, i + chunkSize);
+                            lastRes = await callCloudGet({ action: "backup_chunk", email: email, pin: pin, chunk: chunk });
+                            if (lastRes.status !== "ok") throw new Error(lastRes.message || "Chunk failed");
+                        }
+                        statusBox.style.color = "#10b981";
+                        statusBox.innerText = "✅ " + lastRes.message;
                     } else {
-                        const res = await fetch(CLOUD_SCRIPT_URL, {
-                            method: "POST",
-                            headers: { "Content-Type": "text/plain;charset=utf-8" },
-                            body: payloadStr
-                        });
-                        rawResponse = await res.text();
-                    }
-
-                    const result = JSON.parse(rawResponse);
-                    if (result.status === "ok") {
-                        if (actionType === "backup") {
-                            statusBox.style.color = "#10b981";
-                            statusBox.innerText = "✅ " + result.message;
-                        } else if (actionType === "restore" && result.data) {
-                            appData = result.data;
+                        const res = await callCloudGet({ action: "restore", email: email, pin: pin });
+                        if (res.status === "ok" && res.data) {
+                            appData = res.data;
                             saveState();
                             renderPage();
                             updateLockUI();
                             statusBox.style.color = "#10b981";
                             statusBox.innerText = "✅ All books and pages restored!";
+                        } else {
+                            statusBox.style.color = "#ef4444";
+                            statusBox.innerText = "❌ " + (res.message || "Backup not found.");
                         }
-                    } else {
-                        statusBox.style.color = "#ef4444";
-                        statusBox.innerText = "❌ " + (result.message || "Cloud error.");
                     }
                 } catch (err) {
                     statusBox.style.color = "#ef4444";
