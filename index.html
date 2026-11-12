@@ -94,6 +94,7 @@
             <button class="secondary" onclick="openCloneModal()">📋 Clone Template</button>
             <button style="background-color: #8b5cf6;" onclick="openPrintPreview()">📥 Save PDF / Print</button>
             <button style="background-color: #0ea5e9;" onclick="openRatesEditor()">✏️ Edit Rates</button>
+            <button style="background-color: #0d9488;" onclick="openCloudModal()">☁️ Cloud Backup</button>
         </div>
 
         <div class="grid-container">
@@ -159,6 +160,28 @@
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
                 <button class="secondary" id="modal-btn-local" onclick="savePromptedValue(true)">Save for THIS PAGE Only</button>
                 <button id="modal-btn-global" onclick="savePromptedValue(false)">Save GLOBALLY for this Column</button>
+            </div>
+        </div>
+    </div>
+    <div id="cloud-modal" class="drawer-backdrop" style="justify-content: center; align-items: center; z-index: 4000; opacity: 1;">
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 350px; width: 92%; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            <h3 style="font-size: 16px; margin-bottom: 6px; color: #0f766e;">☁️ Cloud Backup & Restore</h3>
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Enter your Email ID and a 4-digit Secret PIN to save or restore all books across devices.</p>
+            
+            <label style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px;">Email ID</label>
+            <input type="email" id="cloud-email-input" placeholder="you@gmail.com" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 10px; font-size: 14px;" />
+            
+            <label style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px;">Secret PIN (4-6 digits)</label>
+            <input type="password" id="cloud-pin-input" placeholder="e.g. 1234" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 12px; font-size: 14px;" />
+            
+            <div id="cloud-status-msg" style="font-size: 12px; margin-bottom: 12px; color: #1e3a8a; font-weight: bold;"></div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <button style="flex: 1; background-color: #0d9488; justify-content: center;" onclick="runCloudAction('backup')">⬆️ Backup Now</button>
+                <button style="flex: 1; background-color: #2563eb; justify-content: center;" onclick="runCloudAction('restore')">⬇️ Restore Data</button>
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+                <button class="secondary" onclick="closeModal('cloud-modal')">Close</button>
             </div>
         </div>
     </div>
@@ -700,6 +723,82 @@ function openRatesEditor() {
         function closePrintPreview() {
             document.getElementById("print-view-overlay").style.display = "none";
             document.getElementById("main-app-content").style.display = "block";
+        }
+        const CLOUD_SCRIPT_URL = https://script.google.com/macros/s/AKfycbzO30L71-xiN8dMKNvt_EhV0Y6_hHlHbhJSD4AffYaSE1J7yFyRv630G8e61aSZnjw/exec;
+
+        function openCloudModal() {
+            closeModal('value-modal');
+            closeModal('rates-modal');
+            closeModal('clone-modal');
+            const savedEmail = localStorage.getItem("ledger_cloud_email") || "";
+            document.getElementById("cloud-email-input").value = savedEmail;
+            document.getElementById("cloud-pin-input").value = "";
+            document.getElementById("cloud-status-msg").innerText = "";
+            document.getElementById("cloud-modal").style.display = "flex";
+        }
+
+        async function runCloudAction(actionType) {
+            const email = document.getElementById("cloud-email-input").value.trim().toLowerCase();
+            const pin = document.getElementById("cloud-pin-input").value.trim();
+            const statusBox = document.getElementById("cloud-status-msg");
+
+            if (!email || !email.includes("@")) {
+                statusBox.style.color = "#ef4444";
+                statusBox.innerText = "Please enter a valid Email ID.";
+                return;
+            }
+            if (!pin || pin.length < 4) {
+                statusBox.style.color = "#ef4444";
+                statusBox.innerText = "Please enter a Secret PIN (at least 4 digits).";
+                return;
+            }
+            if (CLOUD_SCRIPT_URL.includes("PASTE_YOUR")) {
+                statusBox.style.color = "#ef4444";
+                statusBox.innerText = "Google Script URL is not configured yet.";
+                return;
+            }
+
+            if (actionType === "restore") {
+                if (!confirm("This will replace your current phone data with the cloud backup for " + email + ". Continue?")) return;
+            }
+
+            localStorage.setItem("ledger_cloud_email", email);
+            statusBox.style.color = "#1e3a8a";
+            statusBox.innerText = actionType === "backup" ? "⏳ Uploading backup to cloud..." : "⏳ Downloading backup from cloud...";
+
+            try {
+                const response = await fetch(CLOUD_SCRIPT_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify({
+                        action: actionType,
+                        email: email,
+                        pin: pin,
+                        data: actionType === "backup" ? appData : null
+                    })
+                });
+
+                const result = await response.json();
+                if (result.status === "ok") {
+                    if (actionType === "backup") {
+                        statusBox.style.color = "#10b981";
+                        statusBox.innerText = "✅ " + result.message;
+                    } else if (actionType === "restore" && result.data) {
+                        appData = result.data;
+                        saveState();
+                        renderPage();
+                        updateLockUI();
+                        statusBox.style.color = "#10b981";
+                        statusBox.innerText = "✅ All books and pages restored!";
+                    }
+                } else {
+                    statusBox.style.color = "#ef4444";
+                    statusBox.innerText = "❌ " + (result.message || "Cloud error.");
+                }
+            } catch (err) {
+                statusBox.style.color = "#ef4444";
+                statusBox.innerText = "❌ Network error: " + err.message;
+            }
         }
 
         window.onload = function() { initApp(); };
