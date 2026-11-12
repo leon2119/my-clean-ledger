@@ -71,9 +71,8 @@ jobs:
                         });
                     }
 
-                                                           @JavascriptInterface
-                    public String postCloud(final String urlString, final String jsonBody) {
-                        StringBuilder trace = new StringBuilder();
+                                                                              @JavascriptInterface
+                    public String postCloud(final String urlString, final String unusedBody) {
                         try {
                             String currentUrl = urlString;
                             HttpURLConnection conn = null;
@@ -83,29 +82,10 @@ jobs:
                                 URL url = new URL(currentUrl);
                                 conn = (HttpURLConnection) url.openConnection();
                                 conn.setInstanceFollowRedirects(false);
-                                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
-
-                                if (step == 1) {
-                                    conn.setRequestMethod("POST");
-                                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                                    conn.setDoOutput(true);
-                                    OutputStream os = conn.getOutputStream();
-                                    os.write(jsonBody.getBytes("UTF-8"));
-                                    os.close();
-                                } else {
-                                    conn.setRequestMethod("GET");
-                                }
-
+                                conn.setRequestMethod("GET");
                                 code = conn.getResponseCode();
                                 String loc = conn.getHeaderField("Location");
-                                trace.append("Step ").append(step).append(": HTTP ").append(code);
-                                if (loc != null) {
-                                    trace.append(" -> ").append(loc.length() > 60 ? loc.substring(0, 60) + "..." : loc);
-                                }
-                                trace.append(" | ");
-
-                                if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
-                                    if (loc == null) break;
+                                if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && loc != null) {
                                     currentUrl = loc;
                                 } else {
                                     break;
@@ -119,17 +99,9 @@ jobs:
                             String line;
                             while ((line = br.readLine()) != null) sb.append(line);
                             br.close();
-
-                            String res = sb.toString().trim();
-                            if (res.startsWith("{")) {
-                                return res;
-                            }
-
-                            String cleanSnippet = res.replaceAll("<[^>]*>", " ").replaceAll("\\s+", " ").trim();
-                            if (cleanSnippet.length() > 250) cleanSnippet = cleanSnippet.substring(0, 250);
-                            return "{\"status\":\"error\",\"message\":\"DIAGNOSTIC: " + trace.toString().replace("\"", "'") + " BODY: " + cleanSnippet.replace("\"", "'") + "\"}";
+                            return sb.toString().trim();
                         } catch (Exception e) {
-                            return "{\"status\":\"error\",\"message\":\"CRASH (" + trace.toString().replace("\"", "'") + "): " + e.toString().replace("\"", "'") + "\"}";
+                            return "{\"status\":\"error\",\"message\":\"" + e.toString().replace("\"", "'") + "\"}";
                         }
                     }
 
