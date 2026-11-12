@@ -737,7 +737,7 @@ function openRatesEditor() {
             document.getElementById("cloud-modal").style.display = "flex";
         }
 
-        async function runCloudAction(actionType) {
+                async function runCloudAction(actionType) {
             const email = document.getElementById("cloud-email-input").value.trim().toLowerCase();
             const pin = document.getElementById("cloud-pin-input").value.trim();
             const statusBox = document.getElementById("cloud-status-msg");
@@ -766,40 +766,51 @@ function openRatesEditor() {
             statusBox.style.color = "#1e3a8a";
             statusBox.innerText = actionType === "backup" ? "⏳ Uploading backup..." : "⏳ Downloading backup...";
 
-            try {
-                const response = await fetch(CLOUD_SCRIPT_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain;charset=utf-8" },
-                    body: JSON.stringify({
+            setTimeout(async () => {
+                try {
+                    const payloadStr = JSON.stringify({
                         action: actionType,
                         email: email,
                         pin: pin,
                         data: actionType === "backup" ? appData : null
-                    })
-                });
+                    });
 
-                const result = await response.json();
-                if (result.status === "ok") {
-                    if (actionType === "backup") {
-                        statusBox.style.color = "#10b981";
-                        statusBox.innerText = "✅ " + result.message;
-                    } else if (actionType === "restore" && result.data) {
-                        appData = result.data;
-                        saveState();
-                        renderPage();
-                        updateLockUI();
-                        statusBox.style.color = "#10b981";
-                        statusBox.innerText = "✅ All books and pages restored!";
+                    let rawResponse = "";
+                    if (window.AndroidPrinter && window.AndroidPrinter.postCloud) {
+                        rawResponse = window.AndroidPrinter.postCloud(CLOUD_SCRIPT_URL, payloadStr);
+                    } else {
+                        const res = await fetch(CLOUD_SCRIPT_URL, {
+                            method: "POST",
+                            headers: { "Content-Type": "text/plain;charset=utf-8" },
+                            body: payloadStr
+                        });
+                        rawResponse = await res.text();
                     }
-                } else {
+
+                    const result = JSON.parse(rawResponse);
+                    if (result.status === "ok") {
+                        if (actionType === "backup") {
+                            statusBox.style.color = "#10b981";
+                            statusBox.innerText = "✅ " + result.message;
+                        } else if (actionType === "restore" && result.data) {
+                            appData = result.data;
+                            saveState();
+                            renderPage();
+                            updateLockUI();
+                            statusBox.style.color = "#10b981";
+                            statusBox.innerText = "✅ All books and pages restored!";
+                        }
+                    } else {
+                        statusBox.style.color = "#ef4444";
+                        statusBox.innerText = "❌ " + (result.message || "Cloud error.");
+                    }
+                } catch (err) {
                     statusBox.style.color = "#ef4444";
-                    statusBox.innerText = "❌ " + (result.message || "Cloud error.");
+                    statusBox.innerText = "❌ Error: " + err.message;
                 }
-            } catch (err) {
-                statusBox.style.color = "#ef4444";
-                statusBox.innerText = "❌ Network error: " + err.message;
-            }
+            }, 100);
         }
+
 
         window.onload = function() { initApp(); };
     </script>
