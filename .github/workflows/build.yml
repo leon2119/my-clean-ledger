@@ -71,12 +71,12 @@ jobs:
                         });
                     }
 
-                    @JavascriptInterface
+                                        @JavascriptInterface
                     public String postCloud(final String urlString, final String jsonBody) {
                         try {
                             URL url = new URL(urlString);
                             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                            conn.setInstanceFollowRedirects(true);
+                            conn.setInstanceFollowRedirects(false);
                             conn.setRequestMethod("POST");
                             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                             conn.setDoOutput(true);
@@ -85,6 +85,13 @@ jobs:
                             os.close();
 
                             int code = conn.getResponseCode();
+                            if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                                String redirectUrl = conn.getHeaderField("Location");
+                                conn = (HttpURLConnection) new URL(redirectUrl).openConnection();
+                                conn.setRequestMethod("GET");
+                                code = conn.getResponseCode();
+                            }
+
                             BufferedReader br = new BufferedReader(new InputStreamReader(
                                 code >= 200 && code < 400 ? conn.getInputStream() : conn.getErrorStream(), "UTF-8"
                             ));
